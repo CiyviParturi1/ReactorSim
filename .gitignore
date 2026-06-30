@@ -1,0 +1,111 @@
+﻿# This repository keeps the inputs needed to rebuild the FPGA design:
+# source code, constraints, Vivado block designs/IP configuration, and scripts.
+# Tool-generated products and per-user IDE state are intentionally excluded.
+
+# Editor, OS, Python, and AMD/Xilinx workspace state
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+**/_ide/
+**/.Xil/
+**/.cache/
+**/.vs/
+**/.rigel_lopper/
+**/.vitisWorkspace.json
+**/compile_commands.json
+
+# Logs, journals, locks, and transient databases
+*.jou
+*.log
+*.str
+*.lock
+*.lck
+*.pb
+*.wdb
+*.wdf
+*.vdi
+*.rpx
+*.rpt
+*.xml~
+dfx_runtime.txt
+
+# Vivado generated directories. Keep *.xpr, pk.srcs/**, *.bd, *.xci, *.xdc,
+# and block-design UI layout.
+vivado/*.cache/
+vivado/*.gen/
+vivado/*.hw/
+vivado/*.ip_user_files/
+vivado/*.runs/
+vivado/*.sim/
+
+# Generated implementation/synthesis products and hardware exports
+*.bit
+*.bin
+*.pdi
+*.dcp
+*.xsa
+*.ltx
+*.mmi
+*.sysdef
+*.hwdef
+
+# Vitis HLS output. Keep top-level sources, testbench, hls_config.cfg, and
+# vitis-comp.json; the nested work directory is reproducible.
+hls/*/*/hls/
+hls/*/*/logs/
+hls/*/*/reports/
+hls/*/*/*.hlscompile_summary
+hls/*/*/*.hlsrun_*_summary
+hls/*/*/*.zip
+hls/*/dfx_runtime.txt
+
+# Vitis generated platform/application output. Keep vitis/*/src/** and each
+# component's top-level vitis-comp.json.
+vitis/*/build/
+vitis/*/export/
+vitis/*/logs/
+vitis/*/hw/
+vitis/*/ps7_cortexa9_0/
+vitis/*/resources/
+
+# Native compiler/CMake output
+build/
+export/
+Debug/
+Release/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.d
+*.dep
+*.elf
+*.exe
+*.dll
+*.so
+*.a
+*.lib
+
+# Simulation/runtime data
+*.vcd
+*.fst
+*.wcfg
+*.csv
+
+# Tool-created nested metadata that is redundant with this root ignore file
+hls/**/.gitignore
+vitis/**/.gitignore
+hls/*/*/
+**/.clangd
+vitis/*/src/app.yaml

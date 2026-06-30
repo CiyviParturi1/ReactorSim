@@ -1,0 +1,54 @@
+﻿# Normalize text files for stable diffs across Windows and Linux.
+* text=auto
+
+# Source, HDL, constraints, scripts, and AMD/Xilinx project metadata
+*.c       text eol=lf
+*.cc      text eol=lf
+*.cpp     text eol=lf
+*.h       text eol=lf
+*.hpp     text eol=lf
+*.py      text eol=lf
+*.tcl     text eol=lf
+*.sh      text eol=lf
+*.v       text eol=lf
+*.sv      text eol=lf
+*.vh      text eol=lf
+*.vhd     text eol=lf
+*.vhdl    text eol=lf
+*.xdc     text eol=lf
+*.xpr     text eol=lf
+*.xci     text eol=lf
+*.bd      text eol=lf
+*.bda     text eol=lf
+*.ui      text eol=lf
+*.cfg     text eol=lf
+*.cmake   text eol=lf
+*.json    text eol=lf
+*.yaml    text eol=lf
+*.yml     text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.ld      text eol=lf
+Makefile  text eol=lf
+
+# Windows command scripts require CRLF.
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+
+# Binary/generated formats (normally ignored, but safe if deliberately added).
+*.bit     binary
+*.bin     binary
+*.pdi     binary
+*.dcp     binary
+*.xsa     binary
+*.zip     binary
+*.elf     binary
+*.exe     binary
+*.dll     binary
+*.so      binary
+*.a       binary
+*.lib     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.pdf     binary

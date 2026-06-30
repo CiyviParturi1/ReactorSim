@@ -1,0 +1,1362 @@
+{
+  "schema": "xilinx.com:schema:json_instance:1.0",
+  "ip_inst": {
+    "xci_name": "system_point_kinetics_step_0_0",
+    "cell_name": "point_kinetics_step_0",
+    "component_reference": "xilinx.com:hls:point_kinetics_step:1.0",
+    "ip_revision": "2114626632",
+    "gen_directory": "../../../../../../pk.gen/sources_1/bd/system/ip/system_point_kinetics_step_0_0",
+    "parameters": {
+      "component_parameters": {
+        "Component_Name": [ { "value": "system_point_kinetics_step_0_0", "resolve_type": "user", "usage": "all" } ],
+        "clk_period": [ { "value": "10", "enabled": false, "usage": "all" } ],
+        "machine": [ { "value": "64", "enabled": false, "usage": "all" } ],
+        "combinational": [ { "value": "0", "enabled": false, "usage": "all" } ],
+        "latency": [ { "value": "1024", "enabled": false, "usage": "all" } ],
+        "II": [ { "value": "1025 ~ 5901045", "enabled": false, "usage": "all" } ]
+      },
+      "model_parameters": {
+        "C_S_AXI_CTRL_ADDR_WIDTH": [ { "value": "9", "resolve_type": "generated", "format": "long", "usage": "all" } ],
+        "C_S_AXI_CTRL_DATA_WIDTH": [ { "value": "32", "format": "long", "usage": "all" } ]
+      },
+      "project_parameters": {
+        "ARCHITECTURE": [ { "value": "zynq", "resolve_type": "generated", "usage": "all" } ],
+        "BASE_BOARD_PART": [ { "value": "avnet.com:zedboard:part0:1.4", "resolve_type": "generated", "usage": "all" } ],
+        "BOARD_CONNECTIONS": [ { "value": "", "resolve_type": "generated", "usage": "all" } ],
+        "DEVICE": [ { "value": "xc7z020", "resolve_type": "generated", "usage": "all" } ],
+        "PACKAGE": [ { "value": "clg484", "resolve_type": "generated", "usage": "all" } ],
+        "PREFHDL": [ { "value": "VERILOG", "resolve_type": "generated", "usage": "all" } ],
+        "SILICON_REVISION": [ { "value": "", "resolve_type": "generated", "usage": "all" } ],
+        "SIMULATOR_LANGUAGE": [ { "value": "MIXED", "resolve_type": "generated", "usage": "all" } ],
+        "SPEEDGRADE": [ { "value": "-1", "resolve_type": "generated", "usage": "all" } ],
+        "STATIC_POWER": [ { "value": "", "resolve_type": "generated", "usage": "all" } ],
+        "TEMPERATURE_GRADE": [ { "value": "", "resolve_type": "generated", "usage": "all" } ]
+      },
+      "runtime_parameters": {
+        "IPCONTEXT": [ { "value": "IP_Integrator" } ],
+        "IPREVISION": [ { "value": "2114626632" } ],
+        "MANAGED": [ { "value": "TRUE" } ],
+        "OUTPUTDIR": [ { "value": "../../../../../../pk.gen/sources_1/bd/system/ip/system_point_kinetics_step_0_0" } ],
+        "SELECTEDSIMMODEL": [ { "value": "" } ],
+        "SHAREDDIR": [ { "value": "../../ipshared" } ],
+        "SWVERSION": [ { "value": "2025.2" } ],
+        "SYNTHESISFLOW": [ { "value": "OUT_OF_CONTEXT" } ]
+      }
+    },
+    "boundary": {
+      "ports": {
+        "s_axi_CTRL_ARADDR": [ { "direction": "in", "size_left": "8", "size_right": "0" } ],
+        "s_axi_CTRL_ARREADY": [ { "direction": "out" } ],
+        "s_axi_CTRL_ARVALID": [ { "direction": "in" } ],
+        "s_axi_CTRL_AWADDR": [ { "direction": "in", "size_left": "8", "size_right": "0" } ],
+        "s_axi_CTRL_AWREADY": [ { "direction": "out" } ],
+        "s_axi_CTRL_AWVALID": [ { "direction": "in" } ],
+        "s_axi_CTRL_BREADY": [ { "direction": "in" } ],
+        "s_axi_CTRL_BRESP": [ { "direction": "out", "size_left": "1", "size_right": "0" } ],
+        "s_axi_CTRL_BVALID": [ { "direction": "out" } ],
+        "s_axi_CTRL_RDATA": [ { "direction": "out", "size_left": "31", "size_right": "0" } ],
+        "s_axi_CTRL_RREADY": [ { "direction": "in" } ],
+        "s_axi_CTRL_RRESP": [ { "direction": "out", "size_left": "1", "size_right": "0" } ],
+        "s_axi_CTRL_RVALID": [ { "direction": "out" } ],
+        "s_axi_CTRL_WDATA": [ { "direction": "in", "size_left": "31", "size_right": "0" } ],
+        "s_axi_CTRL_WREADY": [ { "direction": "out" } ],
+        "s_axi_CTRL_WSTRB": [ { "direction": "in", "size_left": "3", "size_right": "0" } ],
+        "s_axi_CTRL_WVALID": [ { "direction": "in" } ],
+        "ap_clk": [ { "direction": "in" } ],
+        "ap_rst_n": [ { "direction": "in" } ],
+        "interrupt": [ { "direction": "out" } ]
+      },
+      "interfaces": {
+        "s_axi_CTRL": {
+          "vlnv": "xilinx.com:interface:aximm:1.0",
+          "abstraction_type": "xilinx.com:interface:aximm_rtl:1.0",
+          "mode": "slave",
+          "memory_map_ref": "s_axi_CTRL",
+          "parameters": {
+            "ADDR_WIDTH": [ { "value": "9", "value_src": "constant", "value_permission": "bd_and_user", "usage": "all" } ],
+            "DATA_WIDTH": [ { "value": "32", "value_src": "constant", "value_permission": "bd_and_user", "usage": "all" } ],
+            "PROTOCOL": [ { "value": "AXI4LITE", "value_src": "constant", "value_permission": "bd_and_user", "usage": "all" } ],
+            "READ_WRITE_MODE": [ { "value": "READ_WRITE", "value_src": "constant", "value_permission": "bd_and_user", "usage": "all" } ],
+            "FREQ_HZ": [ { "value": "100000000", "value_src": "user_prop", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "ID_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "AWUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "ARUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "WUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "RUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "BUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_BURST": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_LOCK": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_PROT": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_CACHE": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_QOS": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_REGION": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_WSTRB": [ { "value": "1", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_BRESP": [ { "value": "1", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "HAS_RRESP": [ { "value": "1", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "SUPPORTS_NARROW_BURST": [ { "value": "0", "value_src": "auto", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "NUM_READ_OUTSTANDING": [ { "value": "1", "value_src": "auto", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "NUM_WRITE_OUTSTANDING": [ { "value": "1", "value_src": "auto", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "MAX_BURST_LENGTH": [ { "value": "1", "value_src": "auto", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "PHASE": [ { "value": "0.0", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "float", "is_ips_inferred": true, "is_static_object": false } ],
+            "CLK_DOMAIN": [ { "value": "system_processing_system7_0_0_FCLK_CLK0", "value_src": "default_prop", "value_permission": "bd_and_user", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
+            "NUM_READ_THREADS": [ { "value": "1", "value_src": "user_prop", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "NUM_WRITE_THREADS": [ { "value": "1", "value_src": "user_prop", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "RUSER_BITS_PER_BYTE": [ { "value": "0", "value_src": "user_prop", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "WUSER_BITS_PER_BYTE": [ { "value": "0", "value_src": "user_prop", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "INSERT_VIP": [ { "value": "0", "resolve_type": "user", "format": "long", "usage": "simulation.rtl", "is_ips_inferred": true, "is_static_object": false } ]
+          },
+          "port_maps": {
+            "ARADDR": [ { "physical_name": "s_axi_CTRL_ARADDR" } ],
+            "ARREADY": [ { "physical_name": "s_axi_CTRL_ARREADY" } ],
+            "ARVALID": [ { "physical_name": "s_axi_CTRL_ARVALID" } ],
+            "AWADDR": [ { "physical_name": "s_axi_CTRL_AWADDR" } ],
+            "AWREADY": [ { "physical_name": "s_axi_CTRL_AWREADY" } ],
+            "AWVALID": [ { "physical_name": "s_axi_CTRL_AWVALID" } ],
+            "BREADY": [ { "physical_name": "s_axi_CTRL_BREADY" } ],
+            "BRESP": [ { "physical_name": "s_axi_CTRL_BRESP" } ],
+            "BVALID": [ { "physical_name": "s_axi_CTRL_BVALID" } ],
+            "RDATA": [ { "physical_name": "s_axi_CTRL_RDATA" } ],
+            "RREADY": [ { "physical_name": "s_axi_CTRL_RREADY" } ],
+            "RRESP": [ { "physical_name": "s_axi_CTRL_RRESP" } ],
+            "RVALID": [ { "physical_name": "s_axi_CTRL_RVALID" } ],
+            "WDATA": [ { "physical_name": "s_axi_CTRL_WDATA" } ],
+            "WREADY": [ { "physical_name": "s_axi_CTRL_WREADY" } ],
+            "WSTRB": [ { "physical_name": "s_axi_CTRL_WSTRB" } ],
+            "WVALID": [ { "physical_name": "s_axi_CTRL_WVALID" } ]
+          }
+        },
+        "ap_clk": {
+          "vlnv": "xilinx.com:signal:clock:1.0",
+          "abstraction_type": "xilinx.com:signal:clock_rtl:1.0",
+          "mode": "slave",
+          "parameters": {
+            "ASSOCIATED_BUSIF": [ { "value": "s_axi_CTRL", "value_src": "constant", "value_permission": "bd_and_user", "usage": "all" } ],
+            "ASSOCIATED_RESET": [ { "value": "ap_rst_n", "value_src": "constant", "value_permission": "bd_and_user", "usage": "all" } ],
+            "FREQ_HZ": [ { "value": "100000000", "value_src": "user_prop", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "FREQ_TOLERANCE_HZ": [ { "value": "0", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
+            "PHASE": [ { "value": "0.0", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "float", "is_ips_inferred": true, "is_static_object": false } ],
+            "CLK_DOMAIN": [ { "value": "system_processing_system7_0_0_FCLK_CLK0", "value_src": "default_prop", "value_permission": "bd_and_user", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
+            "ASSOCIATED_PORT": [ { "value": "", "value_permission": "bd_and_user", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
+            "INSERT_VIP": [ { "value": "0", "resolve_type": "user", "format": "long", "usage": "simulation.rtl", "is_ips_inferred": true, "is_static_object": false } ]
+          },
+          "port_maps": {
+            "CLK": [ { "physical_name": "ap_clk" } ]
+          }
+        },
+        "ap_rst_n": {
+          "vlnv": "xilinx.com:signal:reset:1.0",
+          "abstraction_type": "xilinx.com:signal:reset_rtl:1.0",
+          "mode": "slave",
+          "parameters": {
+            "POLARITY": [ { "value": "ACTIVE_LOW", "value_src": "constant", "value_permission": "bd_and_user", "usage": "all" } ],
+            "INSERT_VIP": [ { "value": "0", "resolve_type": "user", "format": "long", "usage": "simulation.rtl", "is_ips_inferred": true, "is_static_object": false } ]
+          },
+          "port_maps": {
+            "RST": [ { "physical_name": "ap_rst_n" } ]
+          }
+        },
+        "interrupt": {
+          "vlnv": "xilinx.com:signal:interrupt:1.0",
+          "abstraction_type": "xilinx.com:signal:interrupt_rtl:1.0",
+          "mode": "master",
+          "parameters": {
+            "SENSITIVITY": [ { "value": "LEVEL_HIGH", "value_src": "constant", "value_permission": "bd_and_user", "usage": "all" } ],
+            "PortWidth": [ { "value": "1", "value_permission": "bd_and_user", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ]
+          },
+          "port_maps": {
+            "INTERRUPT": [ { "physical_name": "interrupt" } ]
+          }
+        }
+      },
+      "memory_maps": {
+        "s_axi_CTRL": {
+          "address_blocks": {
+            "Reg": {
+              "base_address": "0",
+              "range": "65536",
+              "usage": "register",
+              "access": "read-write",
+              "parameters": {
+                "OFFSET_BASE_PARAM": [ { "value": "C_S_AXI_CTRL_BASEADDR" } ],
+                "OFFSET_HIGH_PARAM": [ { "value": "C_S_AXI_CTRL_HIGHADDR" } ]
+              },
+              "registers": {
+                "CTRL": {
+                  "address_offset": "0",
+                  "size": 32,
+                  "display_name": "CTRL",
+                  "description": "Control signals",
+                  "access": "read-write",
+                  "reset_value": "0",
+                  "fields": {
+                    "AP_START": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal Register for 'ap_start'.",
+                      "access": "read-write"
+                    },
+                    "AP_DONE": {
+                      "bit_offset": 1,
+                      "bit_width": 1,
+                      "description": "Control signal Register for 'ap_done'.",
+                      "access": "read-only"
+                    },
+                    "AP_IDLE": {
+                      "bit_offset": 2,
+                      "bit_width": 1,
+                      "description": "Control signal Register for 'ap_idle'.",
+                      "access": "read-only"
+                    },
+                    "AP_READY": {
+                      "bit_offset": 3,
+                      "bit_width": 1,
+                      "description": "Control signal Register for 'ap_ready'.",
+                      "access": "read-only"
+                    },
+                    "RESERVED_1": {
+                      "bit_offset": 4,
+                      "bit_width": 3,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    },
+                    "AUTO_RESTART": {
+                      "bit_offset": 7,
+                      "bit_width": 1,
+                      "description": "Control signal Register for 'auto_restart'.",
+                      "access": "read-write"
+                    },
+                    "RESERVED_2": {
+                      "bit_offset": 8,
+                      "bit_width": 1,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    },
+                    "INTERRUPT": {
+                      "bit_offset": 9,
+                      "bit_width": 1,
+                      "description": "Control signal Register for 'interrupt'.",
+                      "access": "read-only"
+                    },
+                    "RESERVED_3": {
+                      "bit_offset": 10,
+                      "bit_width": 22,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "GIER": {
+                  "address_offset": "4",
+                  "size": 32,
+                  "display_name": "GIER",
+                  "description": "Global Interrupt Enable Register",
+                  "access": "read-write",
+                  "reset_value": "0",
+                  "fields": {
+                    "Enable": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Master enable for the device interrupt output to the system interrupt controller: 0 = Disabled, 1 = Enabled",
+                      "access": "read-write"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "IP_IER": {
+                  "address_offset": "8",
+                  "size": 32,
+                  "display_name": "IP_IER",
+                  "description": "IP Interrupt Enable Register",
+                  "access": "read-write",
+                  "reset_value": "0",
+                  "fields": {
+                    "CHAN0_INT_EN": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Enable Channel 0 (ap_done) Interrupt.  0 = Disabled, 1 = Enabled.",
+                      "access": "read-write"
+                    },
+                    "CHAN1_INT_EN": {
+                      "bit_offset": 1,
+                      "bit_width": 1,
+                      "description": "Enable Channel 1 (ap_ready) Interrupt.  0 = Disabled, 1 = Enabled.",
+                      "access": "read-write"
+                    },
+                    "RESERVED_0": {
+                      "bit_offset": 2,
+                      "bit_width": 30,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "IP_ISR": {
+                  "address_offset": "12",
+                  "size": 32,
+                  "display_name": "IP_ISR",
+                  "description": "IP Interrupt Status Register",
+                  "access": "read-write",
+                  "reset_value": "0",
+                  "fields": {
+                    "CHAN0_INT_ST": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Channel 0 (ap_done) Interrupt Status. 0 = No Channel 0 interrupt, 1 = Channel 0 interrupt.",
+                      "access": "read-only"
+                    },
+                    "CHAN1_INT_ST": {
+                      "bit_offset": 1,
+                      "bit_width": 1,
+                      "description": "Channel 1 (ap_ready) Interrupt Status. 0 = No Channel 1 interrupt, 1 = Channel 1 interrupt.",
+                      "access": "read-only"
+                    },
+                    "RESERVED_0": {
+                      "bit_offset": 2,
+                      "bit_width": 30,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "h": {
+                  "address_offset": "16",
+                  "size": 32,
+                  "display_name": "h",
+                  "description": "Data signal of h",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "h": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of h",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "substeps": {
+                  "address_offset": "24",
+                  "size": 32,
+                  "display_name": "substeps",
+                  "description": "Data signal of substeps",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "substeps": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of substeps",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "tc_factor": {
+                  "address_offset": "32",
+                  "size": 32,
+                  "display_name": "tc_factor",
+                  "description": "Data signal of tc_factor",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "tc_factor": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of tc_factor",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "reset": {
+                  "address_offset": "40",
+                  "size": 32,
+                  "display_name": "reset",
+                  "description": "Data signal of reset",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "reset": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of reset",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "reset_power": {
+                  "address_offset": "48",
+                  "size": 32,
+                  "display_name": "reset_power",
+                  "description": "Data signal of reset_power",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "reset_power": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of reset_power",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "withdraw_cmd": {
+                  "address_offset": "56",
+                  "size": 32,
+                  "display_name": "withdraw_cmd",
+                  "description": "Data signal of withdraw_cmd",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "withdraw_cmd": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of withdraw_cmd",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "insert_cmd": {
+                  "address_offset": "64",
+                  "size": 32,
+                  "display_name": "insert_cmd",
+                  "description": "Data signal of insert_cmd",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "insert_cmd": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of insert_cmd",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "scram_cmd": {
+                  "address_offset": "72",
+                  "size": 32,
+                  "display_name": "scram_cmd",
+                  "description": "Data signal of scram_cmd",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "scram_cmd": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of scram_cmd",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "t_out": {
+                  "address_offset": "80",
+                  "size": 32,
+                  "display_name": "t_out",
+                  "description": "Data signal of t_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "t_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of t_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "t_out_ctrl": {
+                  "address_offset": "84",
+                  "size": 32,
+                  "display_name": "t_out_ctrl",
+                  "description": "Control signal of t_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "t_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal t_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "N_out": {
+                  "address_offset": "96",
+                  "size": 32,
+                  "display_name": "N_out",
+                  "description": "Data signal of N_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "N_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of N_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "N_out_ctrl": {
+                  "address_offset": "100",
+                  "size": 32,
+                  "display_name": "N_out_ctrl",
+                  "description": "Control signal of N_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "N_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal N_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "Tf_out": {
+                  "address_offset": "112",
+                  "size": 32,
+                  "display_name": "Tf_out",
+                  "description": "Data signal of Tf_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "Tf_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of Tf_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "Tf_out_ctrl": {
+                  "address_offset": "116",
+                  "size": 32,
+                  "display_name": "Tf_out_ctrl",
+                  "description": "Control signal of Tf_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "Tf_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal Tf_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "Tc_out": {
+                  "address_offset": "128",
+                  "size": 32,
+                  "display_name": "Tc_out",
+                  "description": "Data signal of Tc_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "Tc_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of Tc_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "Tc_out_ctrl": {
+                  "address_offset": "132",
+                  "size": 32,
+                  "display_name": "Tc_out_ctrl",
+                  "description": "Control signal of Tc_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "Tc_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal Tc_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "I_Xe_out": {
+                  "address_offset": "144",
+                  "size": 32,
+                  "display_name": "I_Xe_out",
+                  "description": "Data signal of I_Xe_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "I_Xe_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of I_Xe_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "I_Xe_out_ctrl": {
+                  "address_offset": "148",
+                  "size": 32,
+                  "display_name": "I_Xe_out_ctrl",
+                  "description": "Control signal of I_Xe_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "I_Xe_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal I_Xe_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "Xe_out": {
+                  "address_offset": "160",
+                  "size": 32,
+                  "display_name": "Xe_out",
+                  "description": "Data signal of Xe_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "Xe_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of Xe_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "Xe_out_ctrl": {
+                  "address_offset": "164",
+                  "size": 32,
+                  "display_name": "Xe_out_ctrl",
+                  "description": "Control signal of Xe_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "Xe_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal Xe_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "rho_out": {
+                  "address_offset": "176",
+                  "size": 32,
+                  "display_name": "rho_out",
+                  "description": "Data signal of rho_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rho_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of rho_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "rho_out_ctrl": {
+                  "address_offset": "180",
+                  "size": 32,
+                  "display_name": "rho_out_ctrl",
+                  "description": "Control signal of rho_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rho_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal rho_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "dollars_out": {
+                  "address_offset": "192",
+                  "size": 32,
+                  "display_name": "dollars_out",
+                  "description": "Data signal of dollars_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "dollars_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of dollars_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "dollars_out_ctrl": {
+                  "address_offset": "196",
+                  "size": 32,
+                  "display_name": "dollars_out_ctrl",
+                  "description": "Control signal of dollars_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "dollars_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal dollars_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "rho_Xe_out": {
+                  "address_offset": "208",
+                  "size": 32,
+                  "display_name": "rho_Xe_out",
+                  "description": "Data signal of rho_Xe_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rho_Xe_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of rho_Xe_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "rho_Xe_out_ctrl": {
+                  "address_offset": "212",
+                  "size": 32,
+                  "display_name": "rho_Xe_out_ctrl",
+                  "description": "Control signal of rho_Xe_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rho_Xe_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal rho_Xe_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "rod_position_out": {
+                  "address_offset": "224",
+                  "size": 32,
+                  "display_name": "rod_position_out",
+                  "description": "Data signal of rod_position_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rod_position_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of rod_position_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "rod_position_out_ctrl": {
+                  "address_offset": "228",
+                  "size": 32,
+                  "display_name": "rod_position_out_ctrl",
+                  "description": "Control signal of rod_position_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rod_position_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal rod_position_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "rod_target_out": {
+                  "address_offset": "240",
+                  "size": 32,
+                  "display_name": "rod_target_out",
+                  "description": "Data signal of rod_target_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rod_target_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of rod_target_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "rod_target_out_ctrl": {
+                  "address_offset": "244",
+                  "size": 32,
+                  "display_name": "rod_target_out_ctrl",
+                  "description": "Control signal of rod_target_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rod_target_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal rod_target_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "tc_factor_out": {
+                  "address_offset": "256",
+                  "size": 32,
+                  "display_name": "tc_factor_out",
+                  "description": "Data signal of tc_factor_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "tc_factor_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of tc_factor_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "tc_factor_out_ctrl": {
+                  "address_offset": "260",
+                  "size": 32,
+                  "display_name": "tc_factor_out_ctrl",
+                  "description": "Control signal of tc_factor_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "tc_factor_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal tc_factor_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "engine_order_out": {
+                  "address_offset": "272",
+                  "size": 32,
+                  "display_name": "engine_order_out",
+                  "description": "Data signal of engine_order_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "engine_order_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of engine_order_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "engine_order_out_ctrl": {
+                  "address_offset": "276",
+                  "size": 32,
+                  "display_name": "engine_order_out_ctrl",
+                  "description": "Control signal of engine_order_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "engine_order_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal engine_order_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_0": {
+                  "address_offset": "288",
+                  "size": 32,
+                  "display_name": "C_out_0",
+                  "description": "Data signal of C_out_0",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_0": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of C_out_0",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_0_ctrl": {
+                  "address_offset": "292",
+                  "size": 32,
+                  "display_name": "C_out_0_ctrl",
+                  "description": "Control signal of C_out_0",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_0_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal C_out_0_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_1": {
+                  "address_offset": "304",
+                  "size": 32,
+                  "display_name": "C_out_1",
+                  "description": "Data signal of C_out_1",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_1": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of C_out_1",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_1_ctrl": {
+                  "address_offset": "308",
+                  "size": 32,
+                  "display_name": "C_out_1_ctrl",
+                  "description": "Control signal of C_out_1",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_1_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal C_out_1_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_2": {
+                  "address_offset": "320",
+                  "size": 32,
+                  "display_name": "C_out_2",
+                  "description": "Data signal of C_out_2",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_2": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of C_out_2",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_2_ctrl": {
+                  "address_offset": "324",
+                  "size": 32,
+                  "display_name": "C_out_2_ctrl",
+                  "description": "Control signal of C_out_2",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_2_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal C_out_2_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_3": {
+                  "address_offset": "336",
+                  "size": 32,
+                  "display_name": "C_out_3",
+                  "description": "Data signal of C_out_3",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_3": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of C_out_3",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_3_ctrl": {
+                  "address_offset": "340",
+                  "size": 32,
+                  "display_name": "C_out_3_ctrl",
+                  "description": "Control signal of C_out_3",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_3_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal C_out_3_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_4": {
+                  "address_offset": "352",
+                  "size": 32,
+                  "display_name": "C_out_4",
+                  "description": "Data signal of C_out_4",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_4": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of C_out_4",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_4_ctrl": {
+                  "address_offset": "356",
+                  "size": 32,
+                  "display_name": "C_out_4_ctrl",
+                  "description": "Control signal of C_out_4",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_4_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal C_out_4_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_5": {
+                  "address_offset": "368",
+                  "size": 32,
+                  "display_name": "C_out_5",
+                  "description": "Data signal of C_out_5",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_5": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of C_out_5",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "C_out_5_ctrl": {
+                  "address_offset": "372",
+                  "size": 32,
+                  "display_name": "C_out_5_ctrl",
+                  "description": "Control signal of C_out_5",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "C_out_5_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal C_out_5_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "set_rod_target_cmd": {
+                  "address_offset": "384",
+                  "size": 32,
+                  "display_name": "set_rod_target_cmd",
+                  "description": "Data signal of set_rod_target_cmd",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "set_rod_target_cmd": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of set_rod_target_cmd",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "rod_target_cmd": {
+                  "address_offset": "392",
+                  "size": 32,
+                  "display_name": "rod_target_cmd",
+                  "description": "Data signal of rod_target_cmd",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "rod_target_cmd": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of rod_target_cmd",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "plant_mode_cmd": {
+                  "address_offset": "400",
+                  "size": 32,
+                  "display_name": "plant_mode_cmd",
+                  "description": "Data signal of plant_mode_cmd",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "plant_mode_cmd": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of plant_mode_cmd",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "plant_mode_update_cmd": {
+                  "address_offset": "408",
+                  "size": 32,
+                  "display_name": "plant_mode_update_cmd",
+                  "description": "Data signal of plant_mode_update_cmd",
+                  "access": "write-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "plant_mode_update_cmd": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of plant_mode_update_cmd",
+                      "access": "write-only"
+                    }
+                  }
+                },
+                "target_h_out": {
+                  "address_offset": "416",
+                  "size": 32,
+                  "display_name": "target_h_out",
+                  "description": "Data signal of target_h_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "target_h_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of target_h_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "target_h_out_ctrl": {
+                  "address_offset": "420",
+                  "size": 32,
+                  "display_name": "target_h_out_ctrl",
+                  "description": "Control signal of target_h_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "target_h_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal target_h_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "decay_heat_out": {
+                  "address_offset": "432",
+                  "size": 32,
+                  "display_name": "decay_heat_out",
+                  "description": "Data signal of decay_heat_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "decay_heat_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of decay_heat_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "decay_heat_out_ctrl": {
+                  "address_offset": "436",
+                  "size": 32,
+                  "display_name": "decay_heat_out_ctrl",
+                  "description": "Control signal of decay_heat_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "decay_heat_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal decay_heat_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "plant_mode_out": {
+                  "address_offset": "448",
+                  "size": 32,
+                  "display_name": "plant_mode_out",
+                  "description": "Data signal of plant_mode_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "plant_mode_out": {
+                      "bit_offset": 0,
+                      "bit_width": 32,
+                      "description": "Bit 31 to 0 of plant_mode_out",
+                      "access": "read-only"
+                    }
+                  }
+                },
+                "plant_mode_out_ctrl": {
+                  "address_offset": "452",
+                  "size": 32,
+                  "display_name": "plant_mode_out_ctrl",
+                  "description": "Control signal of plant_mode_out",
+                  "access": "read-only",
+                  "reset_value": "0",
+                  "fields": {
+                    "plant_mode_out_ap_vld": {
+                      "bit_offset": 0,
+                      "bit_width": 1,
+                      "description": "Control signal plant_mode_out_ap_vld",
+                      "access": "read-only"
+                    },
+                    "RESERVED": {
+                      "bit_offset": 1,
+                      "bit_width": 31,
+                      "description": "Reserved.  0s on read.",
+                      "access": "read-only"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "checksum": "7ff1ed62"
+}
