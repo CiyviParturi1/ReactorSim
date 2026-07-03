@@ -164,6 +164,11 @@ def reader_thread(comm):
                         value(parts, 14),  # real step time
                         value(parts, 15, 0.0),  # decay heat
                         value(parts, 16, 0.0),  # plant mode
+                        value(parts, 17, 0.0),  # rho_rod_dlr
+                        value(parts, 18, 0.0),  # rho_fuel_dlr
+                        value(parts, 19, 0.0),  # rho_coolant_dlr
+                        value(parts, 20, 0.0),  # rho_xenon_dlr
+                        value(parts, 21, 0.9449),  # rod_critical
                     )
                 )
         except ValueError:
@@ -355,6 +360,16 @@ def main():
         0.98, 0.05, "", transform=ax_time.transAxes, color="#00E5FF", ha="right",
         fontweight="bold", fontsize=10
     )
+    reactivity_txt = ax_rho.text(
+        0.02,
+        0.05,
+        "",
+        transform=ax_rho.transAxes,
+        color="#7CFC00",
+        fontsize=8.5,
+        fontweight="bold",
+        bbox=dict(boxstyle="round", facecolor="black", alpha=0.75),
+    )
 
     plant_names = {
         0: "PWR-SMR Passive Safe",
@@ -373,10 +388,15 @@ def main():
     xenon_ratios = []
     target_hs = []
     real_step_times = []
+    rhos_rod = []
+    rhos_fuel = []
+    rhos_coolant = []
+    rhos_xenon = []
+    critical_rods = []
     iodine_ref = None
     xenon_ref = None
-    rod_position_display = 0.9375
-    rod_target_display = 0.9375
+    rod_position_display = 0.9449
+    rod_target_display = 0.9449
     active_plant_mode_display = 0
 
     def update_plant_label():
@@ -421,6 +441,11 @@ def main():
         xenon_ratios.clear()
         target_hs.clear()
         real_step_times.clear()
+        rhos_rod.clear()
+        rhos_fuel.clear()
+        rhos_coolant.clear()
+        rhos_xenon.clear()
+        critical_rods.clear()
         iodine_ref = None
         xenon_ref = None
         update_plant_label()
@@ -437,7 +462,7 @@ def main():
             ln_real_time,
         ):
             line.set_data([], [])
-        for txt in (val_power_txt, val_temp_txt, val_rho_txt, val_poison_txt, val_time_txt):
+        for txt in (val_power_txt, val_temp_txt, val_rho_txt, val_poison_txt, val_time_txt, reactivity_txt):
             txt.set_text("")
         ax_power.set_xlim(0, INITIAL_X_SECONDS)
         ax_power.set_ylim(0, 2)
@@ -454,7 +479,7 @@ def main():
         drain_data_queue()
         clear_plot_data()
         comm.write(f"P {power_fraction}\n")
-        update_rod_display(position=0.9375, target=0.9375)
+        update_rod_display(position=0.9449, target=0.9449)
         fig.canvas.draw_idle()
 
     def scram():
@@ -584,7 +609,7 @@ def main():
     ui_widgets.append(insert_btn)
 
     ax_rod_target_box = fig.add_axes([0.81, 0.27, 0.16, 0.045])
-    rod_target_box = TextBox(ax_rod_target_box, "Rod", initial="0.94")
+    rod_target_box = TextBox(ax_rod_target_box, "Rod", initial="0.945")
     style_textbox(rod_target_box)
     ui_widgets.append(rod_target_box)
 
@@ -642,6 +667,11 @@ def main():
                     real_step_time,
                     decay_heat,
                     plant_mode,
+                    rho_rod_dlr,
+                    rho_fuel_dlr,
+                    rho_coolant_dlr,
+                    rho_xenon_dlr,
+                    rod_critical,
                 ) = parts_tuple
 
                 if t is not None and times and t < times[-1]:
@@ -654,7 +684,8 @@ def main():
 
                 times.append(t)
                 powers.append(power)
-                thermal_powers.append(power + decay_heat)
+                # Grouped decay heat owns 6.6% of equilibrium thermal power.
+                thermal_powers.append(0.934 * power + decay_heat)
                 temps.append(temp)
                 coolants.append(coolant if coolant is not None else float("nan"))
                 rhos_dollars.append(dollars)
@@ -662,6 +693,11 @@ def main():
                 real_step_times.append(
                     max(1e-9, real_step_time) if real_step_time is not None else float("nan")
                 )
+                rhos_rod.append(rho_rod_dlr)
+                rhos_fuel.append(rho_fuel_dlr)
+                rhos_coolant.append(rho_coolant_dlr)
+                rhos_xenon.append(rho_xenon_dlr)
+                critical_rods.append(rod_critical)
 
                 if tc_factor is not None:
                     time_txt.set_text(f"{tc_factor:.0f}x  sim:{t:.1f}s")
@@ -737,6 +773,15 @@ def main():
             val_poison_txt.set_text(f"I: {iodine_ratios[-1]:.3f}  Xe: {xenon_ratios[-1]:.3f}")
         if real_step_times and math.isfinite(real_step_times[-1]):
             val_time_txt.set_text(f"dt_real: {real_step_times[-1]:.2e} s")
+        if rhos_rod:
+            reactivity_txt.set_text(
+                f"Rho Rod: {rhos_rod[-1]:+.4f} $\n"
+                f"Rho Fuel: {rhos_fuel[-1]:+.4f} $\n"
+                f"Rho Cool: {rhos_coolant[-1]:+.4f} $\n"
+                f"Rho Xe: {rhos_xenon[-1]:+.4f} $\n"
+                f"Rho Total: {rhos_dollars[-1]:+.4f} $\n"
+                f"Crit Rod: {critical_rods[-1]*100:.2f}%"
+            )
 
         ax_power.set_xlim(window_start, window_end)
         ax_time.set_xlim(window_start, window_end)

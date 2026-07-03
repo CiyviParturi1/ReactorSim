@@ -97,6 +97,12 @@ static float clamp_float(float value, float low, float high)
     return value;
 }
 
+static int finite_float(float value)
+{
+    return (value == value) && (value <= 3.4028234e38f) &&
+           (value >= -3.4028234e38f);
+}
+
 static void pk_write_float(u32 offset, float value)
 {
     Xil_Out32(PK_BASEADDR + offset, float_to_u32(value));
@@ -283,7 +289,7 @@ static int steps_per_output(float h, float tc_factor)
 
 static void set_time_factor(AppState *state, float factor, float mode_h)
 {
-    if (factor < 1.0f) {
+    if (!finite_float(factor) || factor < 1.0f) {
         factor = 1.0f;
     }
 
@@ -294,9 +300,10 @@ static void set_time_factor(AppState *state, float factor, float mode_h)
         mode_h = MODE_XENON_H;
     }
 
-    state->tc_factor = factor;
     state->h = mode_h;
-    state->substeps = steps_per_output(state->h, state->tc_factor);
+    state->substeps = steps_per_output(state->h, factor);
+    state->tc_factor =
+        ((float)state->substeps * state->h) / WALL_OUTPUT_INTERVAL;
 }
 
 static void apply_command(const char *cmd, AppState *state)
@@ -311,12 +318,13 @@ static void apply_command(const char *cmd, AppState *state)
     } else if ((ch == 'R') || (ch == 'r')) {
         state->scram_pulse = 1;
     } else if ((ch == 'W') || (ch == 'w')) {
-        if (parse_float_arg(cmd + 1, &value)) {
+        if (parse_float_arg(cmd + 1, &value) && finite_float(value)) {
             state->rod_target = clamp_float(value, 0.0f, 1.0f);
             state->set_rod_target = 1;
         }
     } else if ((ch == 'P') || (ch == 'p')) {
-        if (parse_float_arg(cmd + 1, &value) && (value >= 0.0f)) {
+        if (parse_float_arg(cmd + 1, &value) && finite_float(value) &&
+            (value >= 0.0f)) {
             state->reset_power = clamp_float(value, 0.0f, 1.5f);
             state->reset = 1;
         }
@@ -342,7 +350,8 @@ static void apply_command(const char *cmd, AppState *state)
                 return;
         }
     } else if ((ch == 'T') || (ch == 't')) {
-        if (parse_float_arg(cmd + 1, &value) && (value >= 1.0f)) {
+        if (parse_float_arg(cmd + 1, &value) && finite_float(value) &&
+            (value >= 1.0f)) {
             set_time_factor(state, value, 0.0f);
         }
     }

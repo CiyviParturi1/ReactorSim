@@ -27,9 +27,15 @@ def compile_solver():
     print(f"[Build] Compiling {SOURCE_FILE}...", file=sys.stderr)
 
     if platform.system() == "Windows":
-        cmd = ["g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17"]
+        cmd = [
+            "g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17",
+            "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+        ]
     else:
-        cmd = ["g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17", "-pthread"]
+        cmd = [
+            "g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17", "-pthread",
+            "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+        ]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -97,8 +103,8 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if not args.skip_build and not compile_solver() and not os.path.exists(args.executable):
-        print("Aborting: Could not build and no executable found.", file=sys.stderr)
+    if not args.skip_build and not compile_solver():
+        print("Aborting: build failed; refusing to run a stale executable.", file=sys.stderr)
         return 1
 
     if not os.path.exists(args.executable):

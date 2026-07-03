@@ -71,7 +71,8 @@ static int test_hls_top() {
                        "HLS top initializes rod position at target");
     failures += expect(fabs(target_h_out - h) < 1.0e-8f,
                        "HLS top reports target timestep");
-    failures += expect(decay_heat_out == 0.0f, "HLS top reports no initial decay heat");
+    failures += expect(fabs(decay_heat_out - 0.066f) < 1.0e-5f,
+                       "HLS top initializes equilibrium grouped decay heat");
     failures += expect(plant_mode_out == 0.0f, "HLS top starts in PWR-SMR mode");
 
     for (int i = 0; i < 6; ++i) {
@@ -147,12 +148,15 @@ int main() {
     failures += expect(finite_state(sim), "initial state is finite");
     failures += expect(fabs(sim.get_total_rho()) < 1.0e-6f,
                        "initial reactivity is critical");
+    failures += expect(fabs((1.0f - sim.p.total_decay_fraction()) * sim.n +
+                            sim.decay_heat - 1.0f) < 1.0e-6f,
+                       "prompt plus decay heat is normalized at equilibrium");
     failures += expect(sim.tc.factor == 1.0f, "default time factor is 1x");
     failures += expect(fabs(sim.tc.h() - TimeCompression::BASE_H) < 1.0e-6f,
                        "default timestep is BASE_H");
 
     float initial_rod = sim.rod_position;
-    sim.rod_target = clamp_value(initial_rod + 0.10f, 0.0f, 1.0f);
+    sim.rod_target = pk::clamp(initial_rod + 0.10f, 0.0f, 1.0f);
     for (int i = 0; i < 1000; ++i) {
         sim.step(sim.tc.h());
     }
@@ -192,13 +196,10 @@ int main() {
     failures += expect(fabs(sim.tc.h() - 0.002f) < 1.0e-8f,
                        "custom factor clamps timestep");
 
-    float pre_scram_power = sim.n;
+    float decay_at_scram = sim.decay_heat;
     sim.scram();
-    failures += expect(sim.scram_occurred, "SCRAM flag is set");
     failures += expect(sim.rod_position == 0.0f && sim.rod_target == 0.0f,
                        "SCRAM fully inserts rods");
-    failures += expect(fabs(sim.pre_scram_power - pre_scram_power) < 1.0e-6f,
-                       "SCRAM records pre-SCRAM power");
 
     for (int i = 0; i < 500; ++i) {
         sim.step(sim.tc.h());
@@ -216,6 +217,8 @@ int main() {
     failures += expect(finite_state(sim), "state remains finite after SCRAM");
     failures += expect(sim.n >= 0.0f, "power is non-negative after SCRAM");
     failures += expect(sim.decay_heat > 0.0f, "decay heat is tracked after SCRAM");
+    failures += expect(sim.decay_heat < decay_at_scram,
+                       "grouped decay heat decreases after SCRAM");
 
     sim.initialize(0.75f);
     cout << "After reset to 75% power" << endl;
@@ -229,7 +232,6 @@ int main() {
 
     failures += expect(finite_state(sim), "reset state is finite");
     failures += expect(fabs(sim.n - 0.75f) < 1.0e-6f, "reset applies requested power");
-    failures += expect(!sim.scram_occurred, "reset clears SCRAM state");
     failures += expect(fabs(sim.get_total_rho()) < 1.0e-6f,
                        "reset returns to critical rod configuration");
 

@@ -15,6 +15,9 @@ visualization without FPGA hardware.
 - `vivado/` — Vivado project metadata, block design, IP configuration, and constraints.
 - `vitis/pk_app/src/` — standalone Zynq application source.
 - `pc_sim/` — C++ PC simulator and Python launcher/plotter.
+- `common/point_kinetics_core.h` — canonical allocation-free physics core used
+  by the PC simulator and HLS top function.
+- `tests/` — native PC-to-HLS parity and regression scenarios.
 - `scripts/export_vivado_project.tcl` — exports and sanitizes the current Vivado project.
 - `scripts/recreate_vivado_project.tcl` — recreates the Vivado project from versioned sources.
 
@@ -100,7 +103,47 @@ python pc_sim\pc_sim_launcher.py
 ```
 
 The launcher builds `pc_sim/taylor_solver.cpp` with a C++17 compiler and starts
-the real-time plotter.
+the real-time plotter. A failed build aborts the launch instead of falling back
+to a stale executable.
+
+## Model and timing policy
+
+The PC simulator, native tests, HLS top, and Vitis application use the same
+named timing policy:
+
+| Mode | Simulated/wall factor | Physics step |
+| --- | ---: | ---: |
+| REALTIME | 1x | 0.00001 s |
+| TRAINING | 10x | 0.0001 s |
+| XENON | 1000x | 0.002 s (stability limit) |
+
+Custom factors use `min(0.00001 * factor, 0.002)` seconds per physics step.
+Each 10 ms output frame is capped at 100,000 substeps. If a custom request
+exceeds that budget, output column 9 reports the achieved factor rather than
+the unattainable requested factor. PC pacing uses a steady-clock deadline and
+sleeps only for the part of the 10 ms frame left after computation.
+
+Thermal power is `0.934 * neutron_power + decay_heat`. Three continuously
+evolved decay groups contribute 0.066 at unit-power equilibrium, making total
+thermal power exactly 1.0 initially. Their state is continuous across SCRAM
+and decays as fission power falls. The thermal and feedback equations remain a
+lumped educational model, rod worth is linear, and full rod travel takes 100
+simulated seconds.
+
+## Native regression tests
+
+From the repository root, build with strict warnings and run both suites:
+
+```powershell
+g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unknown-pragmas hls\point_kinetics_hls\point_kinetics.cpp hls\point_kinetics_hls\tb_point_kinetics.cpp -o hls\point_kinetics_hls\tb_point_kinetics_test.exe
+.\hls\point_kinetics_hls\tb_point_kinetics_test.exe
+
+g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unknown-pragmas hls\point_kinetics_hls\point_kinetics.cpp tests\pc_hls_parity.cpp -o tests\pc_hls_parity.exe
+.\tests\pc_hls_parity.exe
+```
+
+The parity suite covers equilibrium, rod movement, SCRAM and continuous decay
+heat, reset, all plant presets, non-finite controls, and core/HLS state parity.
 
 ## Version-control policy
 
