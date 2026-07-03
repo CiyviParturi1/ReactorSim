@@ -1,7 +1,7 @@
 #include "point_kinetics.h"
 
 void point_kinetics_step(
-    float h, int substeps, float tc_factor, float reset, float reset_power,
+    float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
     float withdraw_cmd, float insert_cmd, float scram_cmd,
     float *t_out, float *N_out, float *Tf_out, float *Tc_out,
     float *I_Xe_out, float *Xe_out, float *rho_out, float *dollars_out,
@@ -13,7 +13,7 @@ void point_kinetics_step(
 #pragma HLS INTERFACE s_axilite port=h bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=substeps bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=tc_factor bundle=CTRL
-#pragma HLS INTERFACE s_axilite port=reset bundle=CTRL
+#pragma HLS INTERFACE s_axilite port=reset_cmd bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=reset_power bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=withdraw_cmd bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=insert_cmd bundle=CTRL
@@ -41,14 +41,14 @@ void point_kinetics_step(
 #pragma HLS INTERFACE s_axilite port=plant_mode_out bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=return bundle=CTRL
 #pragma HLS ARRAY_PARTITION variable=C_out complete dim=1
-
+ 
     static bool initialized = false;
     static ReactorParams params;
     static pk::ReactorState state;
-
+ 
     const bool plant_update = pk::finite(plant_mode_update_cmd) &&
                               plant_mode_update_cmd > 0.5f;
-    if (!initialized || (pk::finite(reset) && reset > 0.5f) || plant_update) {
+    if (!initialized || (pk::finite(reset_cmd) && reset_cmd > 0.5f) || plant_update) {
         const int mode = plant_update ? pk::clamp(plant_mode_cmd, 0, 2)
                                       : (initialized ? state.plant_mode : 0);
         pk::reset(state, params, reset_power, mode);

@@ -98,7 +98,7 @@ public:
 };
 
 void point_kinetics_step(
-    float h, int substeps, float tc_factor, float reset, float reset_power,
+    float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
     float withdraw_cmd, float insert_cmd, float scram_cmd,
     float *t_out, float *N_out, float *Tf_out, float *Tc_out,
     float *I_Xe_out, float *Xe_out, float *rho_out, float *dollars_out,
