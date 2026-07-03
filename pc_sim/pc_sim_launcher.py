@@ -29,12 +29,12 @@ def compile_solver():
     if platform.system() == "Windows":
         cmd = [
             "g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17",
-            "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+            "-O2", "-Wall", "-Wextra", "-Wpedantic", "-Werror",
         ]
     else:
         cmd = [
             "g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17", "-pthread",
-            "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+            "-O2", "-Wall", "-Wextra", "-Wpedantic", "-Werror",
         ]
 
     try:
