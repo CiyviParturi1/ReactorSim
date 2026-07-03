@@ -16,7 +16,7 @@ enum class TimeMode {
 struct TimeCompression {
     TimeMode mode;
     float factor;
-    static constexpr float BASE_H = 1.0e-5f;
+    static constexpr float BASE_H = 1.0e-4f;
     static constexpr float MAX_H = 2.0e-3f;
     TimeCompression() : mode(TimeMode::REALTIME), factor(1.0f) {}
 

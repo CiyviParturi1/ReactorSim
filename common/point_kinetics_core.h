@@ -24,7 +24,10 @@ inline bool finite(float value) {
 
 struct TimePolicy {
     static float base_h() {
-        return 1.0e-5f;
+        // 1e-4 s = 10,000 physics steps/s at real time.
+        // This matches the FPGA/ARM real-time target and avoids excessive
+        // STDOUT/Matplotlib frame deadline misses.
+        return 1.0e-4f;
     }
 
     static float max_h() {
@@ -64,26 +67,49 @@ struct ReactorParams {
     float decay_fraction[DECAY_GROUPS];
     float decay_lambda[DECAY_GROUPS];
 
-    ReactorParams()
-        : Lambda(0.00002f), beta_total(0.007f), Q(0.0f),
-          gamma(0.2f), K_heat(50.0f), Tm_const(290.0f),
-          gamma_I(0.061f), gamma_Xe(0.003f),
-          lambda_I(2.87e-5f), lambda_Xe(2.09e-5f),
-          kXe_burnout(2.0e-5f), kFission(1.0e4f) {
+        ReactorParams()
+        : Lambda(0.00002f),
+          beta_total(0.007f),
+          Q(0.0f),
+
+          // NuScale-like two-node thermal model.
+          // N = 1.0 corresponds to 200 MWt.
+          // Tc_eq = 265 + 10 / 0.357142857 ≈ 293 C
+          // Tf_eq = 293 + 10 / 0.04 ≈ 543 C
+          gamma(0.04f),
+          K_heat(10.0f),
+          Tm_const(265.0f),
+
+          gamma_I(0.061f),
+          gamma_Xe(0.003f),
+          lambda_I(2.87e-5f),
+          lambda_Xe(2.09e-5f),
+          kXe_burnout(2.0e-5f),
+          kFission(1.0e4f) {
         const float lam[PRECURSOR_GROUPS] = {
-            0.0127f, 0.0317f, 0.155f, 0.311f, 1.4f, 3.87f};
+            0.0127f, 0.0317f, 0.155f, 0.311f, 1.4f, 3.87f
+        };
+
         const float beta[PRECURSOR_GROUPS] = {
             0.000266f, 0.001491f, 0.001316f,
-            0.002849f, 0.000896f, 0.000182f};
+            0.002849f, 0.000896f, 0.000182f
+        };
+
+        // Reduced decay heat model.
+        // Sum = 0.066, so steady full-power decay heat is 6.6%.
         const float fractions[DECAY_GROUPS] = {
-            0.020f, 0.025f, 0.021f};
+            0.020f, 0.025f, 0.021f
+        };
+
         const float lambdas[DECAY_GROUPS] = {
-            0.069314718f, 0.006931472f, 0.000693147f};
+            0.069314718f, 0.006931472f, 0.000693147f
+        };
 
         for (int i = 0; i < PRECURSOR_GROUPS; ++i) {
             lam_i[i] = lam[i];
             beta_i[i] = beta[i];
         }
+
         for (int i = 0; i < DECAY_GROUPS; ++i) {
             decay_fraction[i] = fractions[i];
             decay_lambda[i] = lambdas[i];
@@ -112,21 +138,59 @@ struct PlantConfig {
 inline PlantConfig plant_config(int mode) {
     PlantConfig cfg;
     const int selected_mode = clamp(mode, 0, PLANT_MODES - 1);
-    if (selected_mode == 1) {
-        cfg.alpha_f = -0.5e-5f;
-        cfg.alpha_c = 1.5e-5f;
-        cfg.gamma_c_init = 0.4f;
-        cfg.gamma_c_active = 0.25f;
-        cfg.rho_rod_min = -0.120f;
-        cfg.rho_rod_max = 0.009f;
-    } else {
+
+    if (selected_mode == 0) {
+        // ------------------------------------------------------------
+        // Mode 0: NuScale-like PWR-SMR / passive-safe baseline
+        // ------------------------------------------------------------
         cfg.alpha_f = -2.5e-5f;
         cfg.alpha_c = -1.0e-5f;
-        cfg.gamma_c_init = 0.4f;
-        cfg.gamma_c_active = selected_mode == 2 ? 0.02f : 0.4f;
-        cfg.rho_rod_min = -0.105f;
-        cfg.rho_rod_max = 0.007f;
+
+        // Stable NuScale-like coolant operating point:
+        // Tc_eq ≈ 293 C at N = 1.
+        cfg.gamma_c_init = 0.357142857f;
+        cfg.gamma_c_active = 0.357142857f;
+
+        // Rod worth:
+        // critical rod position = 0.084 / (0.084 + 0.0049) ≈ 0.9449
+        cfg.rho_rod_min = -0.084f;   // -12 dollars
+        cfg.rho_rod_max =  0.0049f;  // +0.7 dollars, below prompt critical
+
+    } else if (selected_mode == 1) {
+        // ------------------------------------------------------------
+        // Mode 1: RBMK-like educational contrast
+        // Positive coolant coefficient + weaker Doppler feedback.
+        // Not a real RBMK model; only a qualitative contrast case.
+        // ------------------------------------------------------------
+        cfg.alpha_f = -0.5e-5f;
+        cfg.alpha_c =  1.5e-5f;
+
+        // Keep initialization near the PWR-SMR temperature scale,
+        // but reduce active heat removal so temperature feedback becomes visible.
+        cfg.gamma_c_init = 0.357142857f;
+        cfg.gamma_c_active = 0.25f;
+
+        // Stronger rod worth for accident/instability demonstration.
+        cfg.rho_rod_min = -0.120f;
+        cfg.rho_rod_max =  0.009f;
+
+    } else {
+        // ------------------------------------------------------------
+        // Mode 2: TMI-loss / loss-of-cooling educational scenario
+        // Negative feedback remains, but heat removal is strongly degraded.
+        // ------------------------------------------------------------
+        cfg.alpha_f = -2.5e-5f;
+        cfg.alpha_c = -1.0e-5f;
+
+        // Initialize from normal PWR-SMR condition,
+        // then simulate degraded heat removal after scenario selection.
+        cfg.gamma_c_init = 0.357142857f;
+        cfg.gamma_c_active = 0.02f;
+
+        cfg.rho_rod_min = -0.084f;
+        cfg.rho_rod_max =  0.0049f;
     }
+
     cfg.kXe_worth = -0.025f;
     return cfg;
 }

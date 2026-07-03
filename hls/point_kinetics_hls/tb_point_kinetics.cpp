@@ -157,7 +157,7 @@ int main() {
 
     float initial_rod = sim.rod_position;
     sim.rod_target = pk::clamp(initial_rod + 0.10f, 0.0f, 1.0f);
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 100; ++i) {
         sim.step(sim.tc.h());
     }
 
@@ -175,8 +175,8 @@ int main() {
 
     sim.tc.set_mode(TimeMode::TRAINING);
     failures += expect(sim.tc.factor == 10.0f, "training mode factor is 10x");
-    failures += expect(fabs(sim.tc.h() - 0.0001f) < 1.0e-8f,
-                       "training mode timestep is 0.0001");
+    failures += expect(fabs(sim.tc.h() - 0.001f) < 1.0e-8f,
+                       "training mode timestep is 0.001");
 
     float t_before_training = sim.t;
     for (int i = 0; i < 100; ++i) {

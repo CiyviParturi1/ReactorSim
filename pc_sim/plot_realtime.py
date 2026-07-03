@@ -260,7 +260,7 @@ def main():
 
     ln_power, = ax_power.plot([], [], color="#FF6B35", lw=2, label="Power (N)")
     ln_thermal, = ax_power.plot(
-        [], [], color="#FF9F1C", lw=2, linestyle="--", label="Total Power (N + Decay Heat)"
+        [], [], color="#FF9F1C", lw=2, linestyle="--", label="Thermal Power"
     )
     ax_power.set_ylabel("Power")
     ax_power.grid(True, alpha=0.2)
@@ -766,7 +766,7 @@ def main():
         ln_target_h.set_data(visible_times, visible_target_hs)
         ln_real_time.set_data(visible_times, visible_real_step_times)
 
-        val_power_txt.set_text(f"N: {powers[-1]:.4f}  Total: {thermal_powers[-1]:.4f}")
+        val_power_txt.set_text(f"N: {powers[-1]:.4f}  Thermal: {thermal_powers[-1]:.4f}")
         val_temp_txt.set_text(f"Tf: {temps[-1]:.1f} deg C  Tc: {coolants[-1]:.1f} deg C")
         val_rho_txt.set_text(f"Rho: {rhos_dollars[-1]:.4f} $")
         if iodine_ratios and math.isfinite(iodine_ratios[-1]):
