@@ -35,6 +35,8 @@ model against a particular reactor.
 
 ## Repository layout
 
+- [`docs/architecture.md`](docs/architecture.md) — runtime, FPGA, build, and
+  verification architecture diagrams.
 - `hls/point_kinetics_hls/` — HLS source, testbench, and component configuration.
 - `vivado/` — Vivado project metadata, block design, IP configuration, and constraints.
 - `vitis/pk_app/src/` — standalone Zynq application source.
