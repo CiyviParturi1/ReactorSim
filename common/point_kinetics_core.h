@@ -8,7 +8,7 @@ namespace pk {
 static const int PRECURSOR_GROUPS = 6;
 static const int DECAY_GROUPS = 3;
 static const int PLANT_MODES = 3;
-static const int MAX_SUBSTEPS = 100000;
+static const int MAX_SUBSTEPS = 1000000;
 
 inline float clamp(float value, float low, float high) {
     return value < low ? low : (value > high ? high : value);
@@ -84,7 +84,7 @@ struct ReactorParams {
           gamma_Xe(0.003f),
           lambda_I(2.87e-5f),
           lambda_Xe(2.09e-5f),
-          kXe_burnout(2.0e-5f),
+          kXe_burnout(5.0e-5f),
           kFission(1.0e4f) {
         const float lam[PRECURSOR_GROUPS] = {
             0.0127f, 0.0317f, 0.155f, 0.311f, 1.4f, 3.87f
@@ -191,7 +191,7 @@ inline PlantConfig plant_config(int mode) {
         cfg.rho_rod_max =  0.00245f;  // +0.35 $
     }
 
-    cfg.kXe_worth = -0.025f;
+    cfg.kXe_worth = -0.020f;
     return cfg;
 }
 
@@ -202,7 +202,6 @@ struct ReactorState {
     float C[PRECURSOR_GROUPS];
     float I_Xe;
     float Xe;
-    float Xe_ref;
 
     // Thermal state and equilibrium references.
     float Tf;
@@ -228,10 +227,7 @@ inline float rod_rho(const ReactorState& state, const PlantConfig& cfg) {
 }
 
 inline float xenon_rho(const ReactorState& state, const PlantConfig& cfg) {
-    return state.Xe_ref > 1.0e-10f
-               ? cfg.kXe_worth *
-                     ((state.Xe - state.Xe_ref) / state.Xe_ref)
-               : 0.0f;
+    return cfg.kXe_worth * (state.Xe - 1.0f);
 }
 
 inline float total_rho(const ReactorState& state, const PlantConfig& cfg) {
@@ -296,10 +292,6 @@ inline void reset(ReactorState& state, const ReactorParams& params,
 
     state.t = 0.0f;
     state.n = power_fraction;
-    state.rod_position = clamp(
-        -cfg.rho_rod_min / (cfg.rho_rod_max - cfg.rho_rod_min), 0.0f, 1.0f);
-    state.rod_target = state.rod_position;
-    state.rod_motion_residual = 0.0f;
     for (int i = 0; i < PRECURSOR_GROUPS; ++i) {
         state.C[i] = (params.beta_i[i] * state.n) /
                      (params.lam_i[i] * params.Lambda);
@@ -321,7 +313,13 @@ inline void reset(ReactorState& state, const ReactorParams& params,
 
     state.I_Xe = power_fraction;
     state.Xe = (Xe_source / Xe_sink) / Xe_ref;
-    state.Xe_ref = state.Xe;
+
+    // Calculate critical rod position to balance the Xenon reactivity and stay critical on reset
+    const float rho_xe = xenon_rho(state, cfg);
+    state.rod_position = clamp(
+        (-rho_xe - cfg.rho_rod_min) / (cfg.rho_rod_max - cfg.rho_rod_min), 0.0f, 1.0f);
+    state.rod_target = state.rod_position;
+    state.rod_motion_residual = 0.0f;
 
     state.decay_heat = 0.0f;
     for (int i = 0; i < DECAY_GROUPS; ++i) {
@@ -452,8 +450,8 @@ inline void advance(ReactorState& state, const ReactorParams& params,
         if (i >= count) {
             break;
         }
-        n_sum += state.n;
         step(state, params, h);
+        n_sum += state.n;
     }
     float poison_dt = h * (float)count;
     float N_avg = n_sum / (float)count;

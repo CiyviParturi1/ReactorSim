@@ -167,9 +167,9 @@ Continuous decay heat groups $D_j(t)$:
 $$\frac{dD_j}{dt} = \lambda_{\text{decay}, j} \left( f_j n(t) - D_j(t) \right)$$
 
 #### Xenon-135 and Iodine-135 Poisons (Normalized)
-Normalized Iodine ratio $I_{\text{norm}}(t) = I(t) / I_{\text{ref}}$ and Xenon ratio $Xe_{\text{norm}}(t) = Xe(t) / Xe_{\text{ref}}$:
+Normalized Iodine ratio $I_{\text{norm}}(t)$ and Xenon ratio $Xe_{\text{norm}}(t)$:
 $$\frac{dI_{\text{norm}}}{dt} = \lambda_I \left( n(t) - I_{\text{norm}}(t) \right)$$
-$$\frac{dXe_{\text{norm}}}{dt} = \frac{\gamma_{Xe} \Sigma_f n(t) + \lambda_I I_{\text{ref}} I_{\text{norm}}(t) - (\lambda_{Xe} + \sigma_a n(t)) Xe_{\text{ref}} Xe_{\text{norm}}(t)}{Xe_{\text{ref}}}$$
+$$\frac{dXe_{\text{norm}}}{dt} = \frac{\gamma_{Xe} \Sigma_f n(t) + \lambda_I I_{\text{ref}} I_{\text{norm}}(t)}{Xe_{\text{ref}}} - (\lambda_{Xe} + \sigma_a n(t)) Xe_{\text{norm}}(t)$$
 
 ---
 
