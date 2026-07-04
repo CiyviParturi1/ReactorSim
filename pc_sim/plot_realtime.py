@@ -164,10 +164,10 @@ def reader_thread(comm):
                         value(parts, 14),  # real step time
                         value(parts, 15, 0.0),  # decay heat
                         value(parts, 16, 0.0),  # plant mode
-                        value(parts, 17, 0.0),  # rho_rod_dlr
-                        value(parts, 18, 0.0),  # rho_fuel_dlr
-                        value(parts, 19, 0.0),  # rho_coolant_dlr
-                        value(parts, 20, 0.0),  # rho_xenon_dlr
+                        value(parts, 17, float("nan")),  # rho_rod_dlr
+                        value(parts, 18, float("nan")),  # rho_fuel_dlr
+                        value(parts, 19, float("nan")),  # rho_coolant_dlr
+                        value(parts, 20, float("nan")),  # rho_xenon_dlr
                         value(parts, 21, 0.75),  # rod_critical
                         value(parts, 22, 0.0),   # scram_active
                     )
@@ -394,8 +394,6 @@ def main():
     rhos_coolant = []
     rhos_xenon = []
     critical_rods = []
-    iodine_ref = None
-    xenon_ref = None
     rod_position_display = 0.75
     rod_target_display = 0.75
     scram_state_display = False
@@ -437,8 +435,6 @@ def main():
                 break
 
     def clear_plot_data():
-        nonlocal iodine_ref, xenon_ref
-
         times.clear()
         powers.clear()
         thermal_powers.clear()
@@ -454,8 +450,6 @@ def main():
         rhos_coolant.clear()
         rhos_xenon.clear()
         critical_rods.clear()
-        iodine_ref = None
-        xenon_ref = None
         update_plant_label()
 
         for line in (
@@ -487,7 +481,6 @@ def main():
         drain_data_queue()
         clear_plot_data()
         comm.write(f"P {power_fraction}\n")
-        update_rod_display(position=0.75, target=0.75, scram_active=0.0)
         fig.canvas.draw_idle()
 
     def scram():
@@ -731,7 +724,7 @@ def main():
     fig.canvas.mpl_connect("key_press_event", on_key)
 
     def update(frame):
-        nonlocal iodine_ref, xenon_ref, active_plant_mode_display
+        nonlocal active_plant_mode_display
 
         while not data_queue.empty():
             try:
@@ -749,7 +742,7 @@ def main():
                     tc_factor,
                     rod_position,
                     rod_target,
-                    _engine_order,
+                    engine_status,
                     target_h,
                     real_step_time,
                     decay_heat,
@@ -788,16 +781,18 @@ def main():
                 critical_rods.append(rod_critical)
 
                 if tc_factor is not None:
-                    time_txt.set_text(f"{tc_factor:.0f}x  sim:{t:.1f}s")
+                    status_suffix = (
+                        "  NUMERICAL TRIP" if engine_status is not None and engine_status <= 0
+                        else ""
+                    )
+                    time_txt.set_text(
+                        f"{tc_factor:.0f}x  sim:{t:.1f}s{status_suffix}"
+                    )
                 if rod_position is not None and rod_target is not None:
                     update_rod_display(position=rod_position, target=rod_target, scram_active=scram_active)
                 if iodine is not None and xenon is not None:
-                    if iodine_ref is None and iodine > 0:
-                        iodine_ref = iodine
-                    if xenon_ref is None and xenon > 0:
-                        xenon_ref = xenon
-                    iodine_ratios.append(iodine / iodine_ref if iodine_ref else float("nan"))
-                    xenon_ratios.append(xenon / xenon_ref if xenon_ref else float("nan"))
+                    iodine_ratios.append(iodine)
+                    xenon_ratios.append(xenon)
                 else:
                     iodine_ratios.append(float("nan"))
                     xenon_ratios.append(float("nan"))
@@ -862,11 +857,14 @@ def main():
         if real_step_times and math.isfinite(real_step_times[-1]):
             val_time_txt.set_text(f"dt_real: {real_step_times[-1]:.2e} s")
         if rhos_rod:
+            def component_text(value):
+                return f"{value:+.4f} $" if math.isfinite(value) else "N/A"
+
             reactivity_txt.set_text(
-                f"Rho Rod: {rhos_rod[-1]:+.4f} $\n"
-                f"Rho Fuel: {rhos_fuel[-1]:+.4f} $\n"
-                f"Rho Cool: {rhos_coolant[-1]:+.4f} $\n"
-                f"Rho Xe: {rhos_xenon[-1]:+.4f} $\n"
+                f"Rho Rod: {component_text(rhos_rod[-1])}\n"
+                f"Rho Fuel: {component_text(rhos_fuel[-1])}\n"
+                f"Rho Cool: {component_text(rhos_coolant[-1])}\n"
+                f"Rho Xe: {component_text(rhos_xenon[-1])}\n"
                 f"Rho Total: {rhos_dollars[-1]:+.4f} $\n"
                 f"Crit Rod: {critical_rods[-1]*100:.2f}%"
             )

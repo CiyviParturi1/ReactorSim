@@ -16,8 +16,8 @@ enum class TimeMode {
 struct TimeCompression {
     TimeMode mode;
     float factor;
-    static constexpr float BASE_H = 1.0e-4f;
-    static constexpr float MAX_H = 2.0e-3f;
+    static constexpr float BASE_H = PK_BASE_H;
+    static constexpr float MAX_H = PK_MAX_H;
     TimeCompression() : mode(TimeMode::REALTIME), factor(1.0f) {}
 
     void set_mode(TimeMode value) {
@@ -98,7 +98,8 @@ public:
 
     void step(float h) {
         pk::step(*this, p, h);
-        pk::update_poison_batched(n, h, p, I_Xe, Xe);
+        pk::update_poison_batched(
+            n, h, p, I_Xe, Xe, I_compensation, Xe_compensation);
     }
 };
 

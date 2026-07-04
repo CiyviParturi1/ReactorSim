@@ -2,10 +2,13 @@
 #include "xil_printf.h"
 #include "xgpio.h"
 #include "xil_io.h"
+#include "xpoint_kinetics_step_hw.h"
 #include "xuartps_hw.h"
 #include "xiltimer.h"
 #include "xtimer_config.h"
 #include "sleep.h"
+
+#include "../../../common/point_kinetics_config.h"
 
 #define GPIO_BASEADDR   XPAR_AXI_GPIO_0_BASEADDR
 #define GPIO_CHANNEL    1
@@ -17,49 +20,50 @@
 
 #define PK_BASEADDR     XPAR_POINT_KINETICS_STEP_0_BASEADDR
 
-#define PK_AP_CTRL      0x000u
-#define PK_H            0x010u
-#define PK_SUBSTEPS     0x018u
-#define PK_TC_FACTOR    0x020u
-#define PK_RESET        0x028u
-#define PK_RESET_POWER  0x030u
-#define PK_WITHDRAW     0x038u
-#define PK_INSERT       0x040u
-#define PK_SCRAM        0x048u
+#define PK_AP_CTRL      XPOINT_KINETICS_STEP_CTRL_ADDR_AP_CTRL
+#define PK_H            XPOINT_KINETICS_STEP_CTRL_ADDR_H_DATA
+#define PK_SUBSTEPS     XPOINT_KINETICS_STEP_CTRL_ADDR_SUBSTEPS_DATA
+#define PK_TC_FACTOR    XPOINT_KINETICS_STEP_CTRL_ADDR_TC_FACTOR_DATA
+#define PK_RESET        XPOINT_KINETICS_STEP_CTRL_ADDR_RESET_CMD_DATA
+#define PK_RESET_POWER  XPOINT_KINETICS_STEP_CTRL_ADDR_RESET_POWER_DATA
+#define PK_WITHDRAW     XPOINT_KINETICS_STEP_CTRL_ADDR_WITHDRAW_CMD_DATA
+#define PK_INSERT       XPOINT_KINETICS_STEP_CTRL_ADDR_INSERT_CMD_DATA
+#define PK_SCRAM        XPOINT_KINETICS_STEP_CTRL_ADDR_SCRAM_CMD_DATA
 
-#define PK_T_OUT        0x050u
-#define PK_N_OUT        0x060u
-#define PK_TF_OUT       0x070u
-#define PK_TC_OUT       0x080u
-#define PK_I_XE_OUT     0x090u
-#define PK_XE_OUT       0x0a0u
-#define PK_RHO_OUT      0x0b0u
-#define PK_DOLLARS_OUT  0x0c0u
-#define PK_RHO_XE_OUT   0x0d0u
-#define PK_ROD_POS_OUT  0x0e0u
-#define PK_ROD_TGT_OUT  0x0f0u
-#define PK_TC_FACT_OUT  0x100u
-#define PK_ENGINE_OUT   0x110u
+#define PK_T_OUT        XPOINT_KINETICS_STEP_CTRL_ADDR_T_OUT_DATA
+#define PK_N_OUT        XPOINT_KINETICS_STEP_CTRL_ADDR_N_OUT_DATA
+#define PK_TF_OUT       XPOINT_KINETICS_STEP_CTRL_ADDR_TF_OUT_DATA
+#define PK_TC_OUT       XPOINT_KINETICS_STEP_CTRL_ADDR_TC_OUT_DATA
+#define PK_I_XE_OUT     XPOINT_KINETICS_STEP_CTRL_ADDR_I_XE_OUT_DATA
+#define PK_XE_OUT       XPOINT_KINETICS_STEP_CTRL_ADDR_XE_OUT_DATA
+#define PK_RHO_OUT      XPOINT_KINETICS_STEP_CTRL_ADDR_RHO_OUT_DATA
+#define PK_DOLLARS_OUT  XPOINT_KINETICS_STEP_CTRL_ADDR_DOLLARS_OUT_DATA
+#define PK_RHO_XE_OUT   XPOINT_KINETICS_STEP_CTRL_ADDR_RHO_XE_OUT_DATA
+#define PK_ROD_POS_OUT  XPOINT_KINETICS_STEP_CTRL_ADDR_ROD_POSITION_OUT_DATA
+#define PK_ROD_TGT_OUT  XPOINT_KINETICS_STEP_CTRL_ADDR_ROD_TARGET_OUT_DATA
+#define PK_TC_FACT_OUT  XPOINT_KINETICS_STEP_CTRL_ADDR_TC_FACTOR_OUT_DATA
+#define PK_ENGINE_OUT   XPOINT_KINETICS_STEP_CTRL_ADDR_ENGINE_ORDER_OUT_DATA
 
-#define PK_SET_ROD_TGT  0x180u
-#define PK_ROD_TGT_CMD  0x188u
-#define PK_PLANT_MODE   0x190u
-#define PK_PLANT_UPD    0x198u
-#define PK_TARGET_H_OUT 0x1a0u
-#define PK_DECAY_OUT    0x1b0u
-#define PK_PLANT_OUT    0x1c0u
-#define PK_CLEAR_SCRAM   0x1d0u
-#define PK_SCRAM_ACTIVE  0x1d8u
+#define PK_SET_ROD_TGT  XPOINT_KINETICS_STEP_CTRL_ADDR_SET_ROD_TARGET_CMD_DATA
+#define PK_ROD_TGT_CMD  XPOINT_KINETICS_STEP_CTRL_ADDR_ROD_TARGET_CMD_DATA
+#define PK_PLANT_MODE   XPOINT_KINETICS_STEP_CTRL_ADDR_PLANT_MODE_CMD_DATA
+#define PK_PLANT_UPD    XPOINT_KINETICS_STEP_CTRL_ADDR_PLANT_MODE_UPDATE_CMD_DATA
+#define PK_TARGET_H_OUT XPOINT_KINETICS_STEP_CTRL_ADDR_TARGET_H_OUT_DATA
+#define PK_DECAY_OUT    XPOINT_KINETICS_STEP_CTRL_ADDR_DECAY_HEAT_OUT_DATA
+#define PK_PLANT_OUT    XPOINT_KINETICS_STEP_CTRL_ADDR_PLANT_MODE_OUT_DATA
+#define PK_CLEAR_SCRAM  XPOINT_KINETICS_STEP_CTRL_ADDR_CLEAR_SCRAM_CMD_DATA
+#define PK_SCRAM_ACTIVE XPOINT_KINETICS_STEP_CTRL_ADDR_SCRAM_ACTIVE_OUT_DATA
 
-#define MODE_REALTIME_H     0.00001f
-#define MODE_TRAINING_H     0.0001f
-#define MODE_XENON_H        0.002f
-#define WALL_OUTPUT_INTERVAL 0.01f
-#define MAX_SUBSTEPS        100000
+#define MODE_REALTIME_H      PK_BASE_H
+#define MODE_TRAINING_H     (PK_BASE_H * 10.0f)
+#define MODE_XENON_H         PK_MAX_H
+#define WALL_OUTPUT_INTERVAL PK_WALL_OUTPUT_INTERVAL
+#define MAX_SUBSTEPS         PK_MAX_SUBSTEPS
 
 typedef struct {
     float h;
     float tc_factor;
+    float reported_factor;
     float reset_power;
     int substeps;
     int reset;
@@ -71,6 +75,8 @@ typedef struct {
     float rod_target;
     int plant_mode;
     int plant_update;
+    float tf_ref;
+    float tc_ref;
 } AppState;
 
 static u32 float_to_u32(float value)
@@ -104,6 +110,42 @@ static int finite_float(float value)
 {
     return (value == value) && (value <= 3.4028234e38f) &&
            (value >= -3.4028234e38f);
+}
+
+static float plant_alpha_f(int mode)
+{
+    if (mode == 1) return PK_MODE1_ALPHA_F;
+    if (mode == 2) return PK_MODE2_ALPHA_F;
+    return PK_MODE0_ALPHA_F;
+}
+
+static float plant_alpha_c(int mode)
+{
+    if (mode == 1) return PK_MODE1_ALPHA_C;
+    if (mode == 2) return PK_MODE2_ALPHA_C;
+    return PK_MODE0_ALPHA_C;
+}
+
+static float plant_rod_min(int mode)
+{
+    if (mode == 1) return PK_MODE1_RHO_ROD_MIN;
+    if (mode == 2) return PK_MODE2_RHO_ROD_MIN;
+    return PK_MODE0_RHO_ROD_MIN;
+}
+
+static float plant_rod_max(int mode)
+{
+    if (mode == 1) return PK_MODE1_RHO_ROD_MAX;
+    if (mode == 2) return PK_MODE2_RHO_ROD_MAX;
+    return PK_MODE0_RHO_ROD_MAX;
+}
+
+static void set_reference_temperatures(AppState *state)
+{
+    state->tc_ref = PK_TM_CONST +
+        (PK_K_HEAT * state->reset_power) / PK_GAMMA_C_INITIAL;
+    state->tf_ref = state->tc_ref +
+        (PK_K_HEAT * state->reset_power) / PK_FUEL_COUPLING;
 }
 
 static void pk_write_float(u32 offset, float value)
@@ -258,6 +300,11 @@ static void print_data_row(float t,
                            float step_real_time,
                            float decay_heat,
                            float plant_mode,
+                           float rho_rod_dlr,
+                           float rho_fuel_dlr,
+                           float rho_coolant_dlr,
+                           float rho_xenon_dlr,
+                           float rod_critical,
                            float scram_active)
 {
     print_csv_value(t); xil_printf(",");
@@ -277,7 +324,11 @@ static void print_data_row(float t,
     print_precise_csv_value(step_real_time); xil_printf(",");
     print_csv_value(decay_heat); xil_printf(",");
     print_csv_value(plant_mode); xil_printf(",");
-    xil_printf("0.0,0.0,0.0,0.0,0.75,");
+    print_csv_value(rho_rod_dlr); xil_printf(",");
+    print_csv_value(rho_fuel_dlr); xil_printf(",");
+    print_csv_value(rho_coolant_dlr); xil_printf(",");
+    print_csv_value(rho_xenon_dlr); xil_printf(",");
+    print_csv_value(rod_critical); xil_printf(",");
     print_csv_value(scram_active); xil_printf("\r\n");
 }
 
@@ -301,6 +352,9 @@ static void set_time_factor(AppState *state, float factor, float mode_h)
 
     if (mode_h <= 0.0f) {
         mode_h = MODE_REALTIME_H * factor;
+    }
+    if (mode_h < MODE_REALTIME_H) {
+        mode_h = MODE_REALTIME_H;
     }
     if (mode_h > MODE_XENON_H) {
         mode_h = MODE_XENON_H;
@@ -334,6 +388,7 @@ static void apply_command(const char *cmd, AppState *state)
         if (parse_float_arg(cmd + 1, &value) && finite_float(value) &&
             (value >= 0.0f)) {
             state->reset_power = clamp_float(value, 0.0f, 1.5f);
+            set_reference_temperatures(state);
             state->reset = 1;
         }
     } else if ((ch == 'C') || (ch == 'c')) {
@@ -341,6 +396,7 @@ static void apply_command(const char *cmd, AppState *state)
         if ((digit >= '0') && (digit <= '2')) {
             state->plant_mode = digit - '0';
             state->reset_power = 1.0f;
+            set_reference_temperatures(state);
             state->plant_update = 1;
         }
     } else if ((ch == 'M') || (ch == 'm')) {
@@ -414,17 +470,37 @@ int main()
     state.rod_target = 0.0f;
     state.plant_mode = 0;
     state.plant_update = 0;
+    state.reported_factor = 1.0f;
+    set_reference_temperatures(&state);
     set_time_factor(&state, 1.0f, MODE_REALTIME_H);
 
     u32 prev_sw = XGpio_DiscreteRead(&gpio, GPIO_CHANNEL);
+    XTime previous_frame_start;
+    int have_previous_frame = 0;
+    XTime_GetTime(&previous_frame_start);
 
     xil_printf("\r\nDATA_START\r\n");
 
     while (1) {
         XTime start_time;
         XTime end_time;
+        XTime frame_start_time;
         XTime frame_end_time;
 
+        XTime_GetTime(&frame_start_time);
+        {
+            float measured_interval = WALL_OUTPUT_INTERVAL;
+            if (have_previous_frame) {
+                measured_interval =
+                    elapsed_seconds(previous_frame_start, frame_start_time);
+            }
+            have_previous_frame = 1;
+            if (measured_interval > 0.0f) {
+                state.reported_factor =
+                    ((float)state.substeps * state.h) / measured_interval;
+            }
+            previous_frame_start = frame_start_time;
+        }
         poll_uart_commands(&state);
 
         u32 sw = XGpio_DiscreteRead(&gpio, GPIO_CHANNEL);
@@ -471,11 +547,28 @@ int main()
         float plant_mode = pk_read_float(PK_PLANT_OUT);
         float scram_active = pk_read_float(PK_SCRAM_ACTIVE);
         float step_real_time = elapsed_seconds(start_time, end_time) / (float)state.substeps;
+        int active_mode = (int)plant_mode;
+        float beta = PK_BETA_TOTAL;
+        float rho_rod_min = plant_rod_min(active_mode);
+        float rho_rod_max = plant_rod_max(active_mode);
+        float rho_rod = rho_rod_min +
+            rod_position * (rho_rod_max - rho_rod_min);
+        float rho_fuel = plant_alpha_f(active_mode) * (Tf - state.tf_ref);
+        float rho_coolant = plant_alpha_c(active_mode) * (Tc - state.tc_ref);
+        float critical_numerator =
+            -rho_fuel - rho_coolant - rho_Xe - rho_rod_min;
+        float rod_critical = clamp_float(
+            critical_numerator / (rho_rod_max - rho_rod_min),
+            0.0f, 1.0f);
+        tc_factor_out = state.reported_factor;
 
         print_data_row(t, n, Tf, rho, dollars, Tc, I_Xe, Xe,
                        rho_Xe, tc_factor_out, rod_position, rod_target,
                        engine_order, target_h, step_real_time,
-                       decay_heat, plant_mode, scram_active);
+                       decay_heat, plant_mode,
+                       rho_rod / beta, rho_fuel / beta,
+                       rho_coolant / beta, rho_Xe / beta,
+                       rod_critical, scram_active);
 
         state.reset = 0;
         state.withdraw_pulse = 0;
@@ -486,7 +579,8 @@ int main()
         state.plant_update = 0;
 
         XTime_GetTime(&frame_end_time);
-        float frame_elapsed = elapsed_seconds(start_time, frame_end_time);
+        float frame_elapsed =
+            elapsed_seconds(frame_start_time, frame_end_time);
         if (frame_elapsed < WALL_OUTPUT_INTERVAL) {
             usleep((unsigned int)((WALL_OUTPUT_INTERVAL - frame_elapsed) * 1000000.0f));
         }

@@ -84,8 +84,8 @@ static int test_hls_top() {
     }
 
 #ifdef POINT_KINETICS_LONG_TEST
-    const float frame_h = 0.00001f;
-    const int frame_substeps = 100000;
+    const float frame_h = PK_BASE_H;
+    const int frame_substeps = PK_MAX_SUBSTEPS;
 #else
     const float frame_h = 0.0001f;
     const int frame_substeps = 100;
@@ -116,7 +116,9 @@ static int test_hls_top() {
         failures += expect(t_out > prev_t, "HLS top time advances beyond float substep precision limit");
         prev_t = t_out;
     }
-    failures += expect(t_out > 5.0f, "HLS top reaches beyond 4 seconds without time freeze");
+    failures += expect(
+        t_out > 2400.0f,
+        "HLS top advances beyond the former 2048-second float freeze");
 #else
     failures += expect(t_out > 0.009f && t_out < 0.011f,
                        "HLS top frame-step time advances in cosim-sized test");

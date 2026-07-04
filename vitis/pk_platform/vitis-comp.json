@@ -3,8 +3,8 @@
   "type": "PLATFORM",
   "configuration": {
     "description": "",
-    "xsa": "X:/pk/vivado/pke_system_wrapper_final.xsa",
-    "xsaPathInPlatform": "pk_platform/hw/pke_system_wrapper_final.xsa",
+    "xsa": "../../build/hardware/pk.xsa",
+    "xsaPathInPlatform": "pk_platform/hw/pk.xsa",
     "emulationXsa": "",
     "emulationXsaPathInPlatform": "",
     "isCustomFSBL": true,

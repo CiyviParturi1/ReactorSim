@@ -43,8 +43,22 @@ void run_simulation_host(ReactorSim& sim, float wall_output_interval) {
         std::chrono::duration_cast<Clock::duration>(
             std::chrono::duration<double>(wall_output_interval));
     Clock::time_point next_deadline = Clock::now() + frame_period;
+    Clock::time_point previous_frame_start = Clock::now();
+    bool have_previous_frame = false;
 
     while (true) {
+        const Clock::time_point frame_start = Clock::now();
+        double measured_wall_interval = wall_output_interval;
+        if (have_previous_frame) {
+            measured_wall_interval =
+                std::chrono::duration<double>(
+                    frame_start - previous_frame_start).count();
+        }
+        have_previous_frame = true;
+        previous_frame_start = frame_start;
+        if (measured_wall_interval <= 0.0) {
+            measured_wall_interval = wall_output_interval;
+        }
         {
             std::lock_guard<std::mutex> lock(command_mutex);
             for (std::size_t index = 0; index < pending_commands.size(); ++index) {
@@ -125,7 +139,8 @@ void run_simulation_host(ReactorSim& sim, float wall_output_interval) {
             const long long rounded = std::llround(requested_step_count);
             steps = rounded < 1 ? 1 : static_cast<int>(rounded);
         }
-        const float achieved_factor = (steps * h) / wall_output_interval;
+        const float achieved_factor = static_cast<float>(
+            (steps * h) / measured_wall_interval);
 
         const Clock::time_point compute_start = Clock::now();
         pk::advance(static_cast<pk::ReactorState&>(sim), sim.p, h, steps);
@@ -142,9 +157,7 @@ void run_simulation_host(ReactorSim& sim, float wall_output_interval) {
         const float rho_coolant_dlr =
             (config.alpha_c * (sim.Tc - sim.Tc_ref)) / beta;
         const float rho_xenon_dlr = pk::xenon_rho(sim, config) / beta;
-        const float rod_critical =
-            -config.rho_rod_min /
-            (config.rho_rod_max - config.rho_rod_min);
+        const float rod_critical = pk::critical_rod_position(sim, config);
 
         std::cout << std::fixed << std::setprecision(6)
                   << sim.t << ',' << sim.n << ',' << sim.Tf << ','
@@ -152,7 +165,8 @@ void run_simulation_host(ReactorSim& sim, float wall_output_interval) {
                   << sim.I_Xe << ',' << sim.Xe << ','
                   << sim.get_xe_rho(config) << ','
                   << achieved_factor << ',' << sim.rod_position << ','
-                  << sim.rod_target << ',' << sim.engine_order << ','
+                  << sim.rod_target << ','
+                  << (sim.numerical_fault ? 0 : sim.engine_order) << ','
                   << std::scientific << std::setprecision(9)
                   << h << ',' << step_real_time << ','
                   << std::fixed << std::setprecision(6)
@@ -188,11 +202,11 @@ int main() {
               << "RESET: P <power>; PLANT: C0=PWR-SMR, "
                  "C1=RBMK-like, C2=TMI-loss\n"
               << "RODS: +/- adjust target, W <0..1> sets target, R=SCRAM\n"
-              << "Canonical timestep: base=1e-5s, maximum=0.002s; "
-                 "output is paced at 100 Hz.\n"
+              << "Canonical timestep: base=1e-4s, maximum=0.002s; "
+                 "output is paced at 10 Hz.\n"
               << "MODEL: grouped decay heat contributes 6.6% at equilibrium; "
                  "prompt thermal "
                  "power contributes 93.4%.\n\n";
-    run_simulation_host(sim, 0.01f);
+    run_simulation_host(sim, PK_WALL_OUTPUT_INTERVAL);
     return 0;
 }

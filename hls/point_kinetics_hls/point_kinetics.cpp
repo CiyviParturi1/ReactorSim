@@ -95,7 +95,7 @@ void point_kinetics_step(
     *rod_target_out = state.rod_target;
     *tc_factor_out =
         pk::finite(tc_factor) && tc_factor >= 1.0f ? tc_factor : 1.0f;
-    *engine_order_out = 1.0f;
+    *engine_order_out = state.numerical_fault ? 0.0f : 1.0f;
     *target_h_out = h;
     *decay_heat_out = state.decay_heat;
     *plant_mode_out = static_cast<float>(state.plant_mode);

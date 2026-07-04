@@ -140,6 +140,18 @@ int main() {
     call_top(h, 1, 1, 0.75f, 0, 0, 0, 0, 0, 0, 0, 0.0f, out);
     failures += compare(core, out, "reset");
 
+    const float reset_powers[] = {0.0f, 0.01f, 0.10f, 0.25f, 0.50f, 1.50f};
+    for (float power : reset_powers) {
+        pk::reset(core, params, power, 0);
+        pk::advance(core, params, h, 1);
+        call_top(h, 1, 1, power, 0, 0, 0, 0, 0, 0, 0, 0.0f, out);
+        failures += compare(core, out, "low-power reset");
+        if (!near(pk::total_rho(core, pk::plant_config(0)), 0.0f)) {
+            std::cerr << "FAIL low-power reset: initial state is not critical\n";
+            ++failures;
+        }
+    }
+
     for (int mode = 0; mode < 3; ++mode) {
         pk::reset(core, params, 1.0f, mode);
         pk::advance(core, params, h, 10);
