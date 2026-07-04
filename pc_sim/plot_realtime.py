@@ -168,7 +168,8 @@ def reader_thread(comm):
                         value(parts, 18, 0.0),  # rho_fuel_dlr
                         value(parts, 19, 0.0),  # rho_coolant_dlr
                         value(parts, 20, 0.0),  # rho_xenon_dlr
-                        value(parts, 21, 0.9449),  # rod_critical
+                        value(parts, 21, 0.75),  # rod_critical
+                        value(parts, 22, 0.0),   # scram_active
                     )
                 )
         except ValueError:
@@ -268,8 +269,8 @@ def main():
     ax_power.set_xlim(0, INITIAL_X_SECONDS)
     ax_power.set_ylim(0, 2)
 
-    ln_temp, = ax_temp.plot([], [], color="#00D4FF", lw=2, label="Fuel Temp (deg C)")
-    ax_temp.set_ylabel("Temperature (deg C)")
+    ln_temp, = ax_temp.plot([], [], color="#00D4FF", lw=2, label="Fuel Temp (°C)")
+    ax_temp.set_ylabel("Temperature (°C)")
     ln_coolant, = ax_temp.plot([], [], color="#4ECDC4", lw=2, label="Coolant Temp")
     ax_temp.grid(True, alpha=0.2)
     ax_temp.legend(loc="upper left", bbox_to_anchor=(1.01, 1), borderaxespad=0)
@@ -341,24 +342,24 @@ def main():
     )
 
     val_power_txt = ax_power.text(
-        0.98, 0.05, "", transform=ax_power.transAxes, color="#FF6B35", ha="right",
-        fontweight="bold", fontsize=10
+        1.0, 1.02, "", transform=ax_power.transAxes, color="#FF6B35", ha="right", va="bottom",
+        fontweight="bold", fontsize=9
     )
     val_temp_txt = ax_temp.text(
-        0.98, 0.05, "", transform=ax_temp.transAxes, color="#00D4FF", ha="right",
-        fontweight="bold", fontsize=10
+        1.0, 1.02, "", transform=ax_temp.transAxes, color="#00D4FF", ha="right", va="bottom",
+        fontweight="bold", fontsize=9
     )
     val_rho_txt = ax_rho.text(
-        0.98, 0.05, "", transform=ax_rho.transAxes, color="#7CFC00", ha="right",
-        fontweight="bold", fontsize=10
+        1.0, 1.02, "", transform=ax_rho.transAxes, color="#7CFC00", ha="right", va="bottom",
+        fontweight="bold", fontsize=9
     )
     val_poison_txt = ax_poison.text(
-        0.98, 0.05, "", transform=ax_poison.transAxes, color="#B388FF", ha="right",
-        fontweight="bold", fontsize=10
+        1.0, 1.02, "", transform=ax_poison.transAxes, color="#B388FF", ha="right", va="bottom",
+        fontweight="bold", fontsize=9
     )
     val_time_txt = ax_time.text(
-        0.98, 0.05, "", transform=ax_time.transAxes, color="#00E5FF", ha="right",
-        fontweight="bold", fontsize=10
+        1.0, 1.02, "", transform=ax_time.transAxes, color="#00E5FF", ha="right", va="bottom",
+        fontweight="bold", fontsize=9
     )
     reactivity_txt = ax_rho.text(
         0.02,
@@ -395,8 +396,9 @@ def main():
     critical_rods = []
     iodine_ref = None
     xenon_ref = None
-    rod_position_display = 0.9449
-    rod_target_display = 0.9449
+    rod_position_display = 0.75
+    rod_target_display = 0.75
+    scram_state_display = False
     active_plant_mode_display = 0
 
     def update_plant_label():
@@ -404,16 +406,22 @@ def main():
         plant_txt.set_text(f"Plant: {name}")
         plant_txt.set_color(plant_colors.get(active_plant_mode_display, "#FFFFFF"))
 
-    def update_rod_display(position=None, target=None, scram=False):
-        nonlocal rod_position_display, rod_target_display
+    def update_rod_display(position=None, target=None, scram_active=None):
+        nonlocal rod_position_display, rod_target_display, scram_state_display
 
         if position is not None:
             rod_position_display = position
         if target is not None:
             rod_target_display = target
-        if scram:
-            rod_txt.set_text("SCRAM - rods inserted")
+        if scram_active is not None:
+            scram_state_display = bool(scram_active)
+
+        if scram_state_display:
+            rod_txt.set_text("SCRAM ACTIVE\nTrip reset required before restart")
             rod_txt.set_color("yellow")
+        elif rod_position_display == 0.0 and rod_target_display == 0.0:
+            rod_txt.set_text("SCRAM CLEARED\nWithdraw rods to restart")
+            rod_txt.set_color("cyan")
         else:
             rod_txt.set_text(f"Rod target: {rod_target_display * 100:.1f}% withdrawn")
             rod_txt.set_color("red")
@@ -479,12 +487,16 @@ def main():
         drain_data_queue()
         clear_plot_data()
         comm.write(f"P {power_fraction}\n")
-        update_rod_display(position=0.9449, target=0.9449)
+        update_rod_display(position=0.75, target=0.75, scram_active=0.0)
         fig.canvas.draw_idle()
 
     def scram():
         comm.write("R\n")
-        update_rod_display(position=0.0, target=0.0, scram=True)
+        update_rod_display(position=0.0, target=0.0, scram_active=1.0)
+
+    def clear_scram():
+        comm.write("K\n")
+        update_rod_display(scram_active=0.0)
 
     def set_rod_target(value):
         try:
@@ -502,6 +514,8 @@ def main():
         try:
             if key in ("r", "R"):
                 scram()
+            elif key in ("k", "K"):
+                clear_scram()
             elif key in ("p", "P"):
                 reset_power(power_box.text)
             elif key in ("up", "+", "="):
@@ -519,6 +533,8 @@ def main():
     action_hover = "#2675AD"
     scram_bg = "#8B1E2D"
     scram_hover = "#B3293C"
+    clear_scram_bg = "#1A5F5A"
+    clear_scram_hover = "#248780"
     rod_bg = "#5C4A16"
     rod_hover = "#80661D"
     text = "#F2F5F8"
@@ -553,18 +569,97 @@ def main():
         for spine in radio.ax.spines.values():
             spine.set_edgecolor("#4B5563")
 
-    ax_power_box = fig.add_axes([0.81, 0.84, 0.16, 0.045])
-    power_box = TextBox(ax_power_box, "Power", initial=f"{args.power:.2f}")
-    style_textbox(power_box)
-    ui_widgets.append(power_box)
+    # Layout configuration helper
+    def update_layout():
+        left = 0.10
+        right = 0.65
+        width = right - left
+        bottom = 0.08
+        top = 0.92
+        total_height = top - bottom
 
-    ax_power_btn = fig.add_axes([0.81, 0.79, 0.16, 0.04])
-    power_btn = Button(ax_power_btn, "Reset P")
-    style_button(power_btn, action_bg, action_hover)
-    power_btn.on_clicked(lambda event: reset_power(power_box.text))
-    ui_widgets.append(power_btn)
+        is_time_visible = ax_time.get_visible()
 
-    ax_mode = fig.add_axes([0.81, 0.62, 0.16, 0.14])
+        active_axes = [ax_power, ax_temp, ax_rho, ax_poison]
+        if is_time_visible:
+            active_axes.append(ax_time)
+
+        N = len(active_axes)
+        S = 0.035 if N == 5 else 0.045
+        H = (total_height - (N - 1) * S) / N
+
+        for idx, ax in enumerate(active_axes):
+            y_bottom = top - (idx + 1) * H - idx * S
+            ax.set_position([left, y_bottom, width, H])
+            ax.set_visible(True)
+
+            is_bottom = (idx == N - 1)
+            ax.tick_params(labelbottom=is_bottom)
+            if is_bottom:
+                ax.set_xlabel("Time (s)")
+            else:
+                ax.set_xlabel("")
+
+        if not is_time_visible:
+            ax_time.set_visible(False)
+
+        fig.canvas.draw_idle()
+
+    # Define Section Header helper
+    def add_section_header(text, y_pos):
+        fig.text(
+            0.81,
+            y_pos,
+            text,
+            color=muted,
+            fontsize=8,
+            fontweight="bold",
+            ha="left",
+            va="bottom",
+        )
+
+    # 1. EMERGENCY Section
+    add_section_header("SAFETY", 0.895)
+    ax_scram_btn = fig.add_axes([0.81, 0.84, 0.16, 0.045])
+    scram_btn = Button(ax_scram_btn, "SCRAM")
+    style_button(scram_btn, scram_bg, scram_hover, size=9)
+    scram_btn.on_clicked(lambda event: scram())
+    ui_widgets.append(scram_btn)
+
+    ax_clear_scram_btn = fig.add_axes([0.81, 0.79, 0.16, 0.04])
+    clear_scram_btn = Button(ax_clear_scram_btn, "Clear SCRAM")
+    style_button(clear_scram_btn, clear_scram_bg, clear_scram_hover, size=9)
+    clear_scram_btn.on_clicked(lambda event: clear_scram())
+    ui_widgets.append(clear_scram_btn)
+
+    # 2. CONTROL ROD Section
+    add_section_header("CONTROL ROD", 0.765)
+    ax_rod_target_box = fig.add_axes([0.81, 0.71, 0.16, 0.045])
+    rod_target_box = TextBox(ax_rod_target_box, "Rod", initial="0.75")
+    style_textbox(rod_target_box)
+    ui_widgets.append(rod_target_box)
+
+    ax_rod_target_btn = fig.add_axes([0.81, 0.66, 0.16, 0.04])
+    rod_target_btn = Button(ax_rod_target_btn, "Set Rod")
+    style_button(rod_target_btn, rod_bg, rod_hover)
+    rod_target_btn.on_clicked(lambda event: set_rod_target(rod_target_box.text))
+    ui_widgets.append(rod_target_btn)
+
+    ax_withdraw_btn = fig.add_axes([0.81, 0.605, 0.075, 0.04])
+    withdraw_btn = Button(ax_withdraw_btn, "Withdraw")
+    style_button(withdraw_btn, rod_bg, rod_hover, size=7)
+    withdraw_btn.on_clicked(lambda event: move_rod_target(0.01))
+    ui_widgets.append(withdraw_btn)
+
+    ax_insert_btn = fig.add_axes([0.895, 0.605, 0.075, 0.04])
+    insert_btn = Button(ax_insert_btn, "Insert")
+    style_button(insert_btn, rod_bg, rod_hover, size=7)
+    insert_btn.on_clicked(lambda event: move_rod_target(-0.01))
+    ui_widgets.append(insert_btn)
+
+    # 3. SIM SPEED & dt Section
+    add_section_header("SIM SPEED & dt", 0.58)
+    ax_mode = fig.add_axes([0.81, 0.45, 0.16, 0.12])
     mode_radio = RadioButtons(ax_mode, ("M0 Real", "M1 Train", "M2 Xenon"), active=0)
     style_radio(mode_radio)
 
@@ -579,47 +674,22 @@ def main():
     mode_radio.on_clicked(set_mode)
     ui_widgets.append(mode_radio)
 
-    ax_factor_box = fig.add_axes([0.81, 0.54, 0.16, 0.045])
-    factor_box = TextBox(ax_factor_box, "Factor", initial="100")
-    style_textbox(factor_box)
-    ui_widgets.append(factor_box)
+    ax_toggle_btn = fig.add_axes([0.81, 0.40, 0.16, 0.04])
+    toggle_btn = Button(ax_toggle_btn, "Show dt Graph")
+    style_button(toggle_btn)
+    
+    def toggle_time_plot(event):
+        is_visible = ax_time.get_visible()
+        ax_time.set_visible(not is_visible)
+        toggle_btn.label.set_text("Hide dt Graph" if not is_visible else "Show dt Graph")
+        update_layout()
 
-    ax_factor_btn = fig.add_axes([0.81, 0.49, 0.16, 0.04])
-    factor_btn = Button(ax_factor_btn, "Set T")
-    style_button(factor_btn)
-    factor_btn.on_clicked(lambda event: comm.write(f"T {factor_box.text}\n"))
-    ui_widgets.append(factor_btn)
+    toggle_btn.on_clicked(toggle_time_plot)
+    ui_widgets.append(toggle_btn)
 
-    ax_scram_btn = fig.add_axes([0.81, 0.42, 0.16, 0.045])
-    scram_btn = Button(ax_scram_btn, "SCRAM")
-    style_button(scram_btn, scram_bg, scram_hover, size=9)
-    scram_btn.on_clicked(lambda event: scram())
-    ui_widgets.append(scram_btn)
-
-    ax_withdraw_btn = fig.add_axes([0.81, 0.34, 0.075, 0.04])
-    withdraw_btn = Button(ax_withdraw_btn, "Withdraw")
-    style_button(withdraw_btn, rod_bg, rod_hover, size=7)
-    withdraw_btn.on_clicked(lambda event: move_rod_target(0.01))
-    ui_widgets.append(withdraw_btn)
-
-    ax_insert_btn = fig.add_axes([0.895, 0.34, 0.075, 0.04])
-    insert_btn = Button(ax_insert_btn, "Insert")
-    style_button(insert_btn, rod_bg, rod_hover, size=7)
-    insert_btn.on_clicked(lambda event: move_rod_target(-0.01))
-    ui_widgets.append(insert_btn)
-
-    ax_rod_target_box = fig.add_axes([0.81, 0.27, 0.16, 0.045])
-    rod_target_box = TextBox(ax_rod_target_box, "Rod", initial="0.945")
-    style_textbox(rod_target_box)
-    ui_widgets.append(rod_target_box)
-
-    ax_rod_target_btn = fig.add_axes([0.81, 0.22, 0.16, 0.04])
-    rod_target_btn = Button(ax_rod_target_btn, "Set Rod")
-    style_button(rod_target_btn, rod_bg, rod_hover)
-    rod_target_btn.on_clicked(lambda event: set_rod_target(rod_target_box.text))
-    ui_widgets.append(rod_target_btn)
-
-    ax_plant = fig.add_axes([0.81, 0.08, 0.16, 0.12])
+    # 4. PLANT PRESETS Section
+    add_section_header("PLANT PRESETS", 0.37)
+    ax_plant = fig.add_axes([0.81, 0.24, 0.16, 0.12])
     plant_radio = RadioButtons(ax_plant, ("PWR-SMR", "RBMK-like", "TMI-loss"), active=0)
     style_radio(plant_radio)
 
@@ -640,6 +710,23 @@ def main():
 
     plant_radio.on_clicked(set_plant)
     ui_widgets.append(plant_radio)
+
+    # 5. POWER RESET Section
+    add_section_header("POWER RESET", 0.20)
+    ax_power_box = fig.add_axes([0.81, 0.14, 0.16, 0.045])
+    power_box = TextBox(ax_power_box, "Power", initial=f"{args.power:.2f}")
+    style_textbox(power_box)
+    ui_widgets.append(power_box)
+
+    ax_power_btn = fig.add_axes([0.81, 0.09, 0.16, 0.04])
+    power_btn = Button(ax_power_btn, "Reset P")
+    style_button(power_btn, action_bg, action_hover)
+    power_btn.on_clicked(lambda event: reset_power(power_box.text))
+    ui_widgets.append(power_btn)
+
+    # Initialize layout and hide ax_time by default
+    ax_time.set_visible(False)
+    update_layout()
 
     fig.canvas.mpl_connect("key_press_event", on_key)
 
@@ -672,6 +759,7 @@ def main():
                     rho_coolant_dlr,
                     rho_xenon_dlr,
                     rod_critical,
+                    scram_active,
                 ) = parts_tuple
 
                 if t is not None and times and t < times[-1]:
@@ -702,7 +790,7 @@ def main():
                 if tc_factor is not None:
                     time_txt.set_text(f"{tc_factor:.0f}x  sim:{t:.1f}s")
                 if rod_position is not None and rod_target is not None:
-                    update_rod_display(position=rod_position, target=rod_target)
+                    update_rod_display(position=rod_position, target=rod_target, scram_active=scram_active)
                 if iodine is not None and xenon is not None:
                     if iodine_ref is None and iodine > 0:
                         iodine_ref = iodine
@@ -767,7 +855,7 @@ def main():
         ln_real_time.set_data(visible_times, visible_real_step_times)
 
         val_power_txt.set_text(f"N: {powers[-1]:.4f}  Thermal: {thermal_powers[-1]:.4f}")
-        val_temp_txt.set_text(f"Tf: {temps[-1]:.1f} deg C  Tc: {coolants[-1]:.1f} deg C")
+        val_temp_txt.set_text(f"Tf: {temps[-1]:.1f}°C  Tc: {coolants[-1]:.1f}°C")
         val_rho_txt.set_text(f"Rho: {rhos_dollars[-1]:.4f} $")
         if iodine_ratios and math.isfinite(iodine_ratios[-1]):
             val_poison_txt.set_text(f"I: {iodine_ratios[-1]:.3f}  Xe: {xenon_ratios[-1]:.3f}")
@@ -843,6 +931,7 @@ def main():
     log("  [Up/+] Withdraw rod target")
     log("  [Down/-] Insert rod target")
     log("  [R]    SCRAM (insert all)")
+    log("  [K]    Clear SCRAM (Reset Trip)")
     log("  [P]    Reinitialize at a power fraction")
     plt.show()
 

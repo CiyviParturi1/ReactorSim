@@ -9,7 +9,8 @@ void point_kinetics_step(
     float *tc_factor_out, float *engine_order_out, float C_out[6],
     float set_rod_target_cmd, float rod_target_cmd, int plant_mode_cmd,
     float plant_mode_update_cmd, float *target_h_out,
-    float *decay_heat_out, float *plant_mode_out) {
+    float *decay_heat_out, float *plant_mode_out,
+    float clear_scram_cmd, float *scram_active_out) {
 #pragma HLS INTERFACE s_axilite port=h bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=substeps bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=tc_factor bundle=CTRL
@@ -39,6 +40,8 @@ void point_kinetics_step(
 #pragma HLS INTERFACE s_axilite port=target_h_out bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=decay_heat_out bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=plant_mode_out bundle=CTRL
+#pragma HLS INTERFACE s_axilite port=clear_scram_cmd bundle=CTRL
+#pragma HLS INTERFACE s_axilite port=scram_active_out bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=return bundle=CTRL
 #pragma HLS ARRAY_PARTITION variable=C_out complete dim=1
  
@@ -67,6 +70,9 @@ void point_kinetics_step(
     if (pk::finite(scram_cmd) && scram_cmd > 0.5f) {
         pk::scram(state);
     }
+    if (pk::finite(clear_scram_cmd) && clear_scram_cmd > 0.5f) {
+        pk::reset_scram_trip(state);
+    }
 
     if (!pk::finite(h) || h <= 0.0f) {
         h = pk::TimePolicy::base_h();
@@ -93,6 +99,7 @@ void point_kinetics_step(
     *target_h_out = h;
     *decay_heat_out = state.decay_heat;
     *plant_mode_out = static_cast<float>(state.plant_mode);
+    *scram_active_out = state.scram_active ? 1.0f : 0.0f;
     for (int i = 0; i < pk::PRECURSOR_GROUPS; ++i) {
 #pragma HLS UNROLL
         C_out[i] = state.C[i];

@@ -130,6 +130,77 @@ and decays as fission power falls. The thermal and feedback equations remain a
 lumped educational model, rod worth is linear, and full rod travel takes 100
 simulated seconds.
 
+### Control Rod Worth Calibration
+- **Baselines:** Regulating rod limits are set to `rho_rod_min = -0.00735f` ($-1.05\$$) and `rho_rod_max = 0.00245f` ($+0.35\$$) under Mode 0 and Mode 2.
+- **Equilibrium:** The critical rod position is located at exactly **75% withdrawn** (`0.75`). Below 75% power slowly decreases, and above 75% power increases until temperature feedback stabilizes it.
+
+### Safety Latching (SCRAM & Reset Trip)
+- **SCRAM:** Applies a permanent, latched emergency shutdown state (`scram_active = true`), adding a safety reactivity penalty of $-10.95\$$ (`-0.07665f`).
+- **Safety Interlock:** Normal regulating rod controls are disabled/blocked while `scram_active` is true.
+- **Trip Reset:** The operator must issue a Reset Trip command/button (`K`/`k` or GUI "Clear SCRAM") to clear the interlock, after which rods may be slowly withdrawn again to restart the reactor.
+
+### Normalized & Batched Poison Updates
+- **Normalized Ratios:** Iodine-135 and Xenon-135 are tracked as normalized ratios around $1.0$ (instead of absolute atom concentrations of $\approx 2 \times 10^7$) to prevent 32-bit floating-point underflow.
+- **Analytical Batching:** Poisons are integrated analytically over each output frame using average power and exponential factors (`expf`), eliminating numerical integration drift and precision freezes.
+
+## Mathematical Model and Numerical Solver
+
+The simulation core solves a coupled system of differential equations describing point kinetics, heat transfer, decay heat, and Xenon/Iodine poisons.
+
+### 1. Coupled Differential Equations
+
+#### Point Kinetics (Neutron Power & Precursors)
+Prompt neutron power $n(t)$ and 6 delayed neutron precursor groups $C_i(t)$:
+$$\frac{dn}{dt} = \frac{\rho(t) - \beta}{L} n(t) + \sum_{i=1}^6 \lambda_i C_i(t) + Q$$
+$$\frac{dC_i}{dt} = \frac{\beta_i}{L} n(t) - \lambda_i C_i(t)$$
+
+#### Thermal Hydraulics (Two-Node Heat Transfer)
+Lumped fuel temperature $T_f(t)$ and coolant temperature $T_c(t)$:
+$$\frac{dT_f}{dt} = K_{\text{heat}} P_{\text{th}}(t) - \gamma (T_f(t) - T_c(t))$$
+$$\frac{dT_c}{dt} = \gamma (T_f(t) - T_c(t)) - \gamma_c (T_c(t) - T_m)$$
+where:
+- $P_{\text{th}}(t) = (1 - f_{\text{decay}}) n(t) + H_{\text{decay}}(t)$ is the total thermal power.
+- $H_{\text{decay}}(t) = \sum_{j=1}^3 D_j(t)$ is the decay heat contribution.
+
+#### Decay Heat (Three Groups)
+Continuous decay heat groups $D_j(t)$:
+$$\frac{dD_j}{dt} = \lambda_{\text{decay}, j} \left( f_j n(t) - D_j(t) \right)$$
+
+#### Xenon-135 and Iodine-135 Poisons (Normalized)
+Normalized Iodine ratio $I_{\text{norm}}(t) = I(t) / I_{\text{ref}}$ and Xenon ratio $Xe_{\text{norm}}(t) = Xe(t) / Xe_{\text{ref}}$:
+$$\frac{dI_{\text{norm}}}{dt} = \lambda_I \left( n(t) - I_{\text{norm}}(t) \right)$$
+$$\frac{dXe_{\text{norm}}}{dt} = \frac{\gamma_{Xe} \Sigma_f n(t) + \lambda_I I_{\text{ref}} I_{\text{norm}}(t) - (\lambda_{Xe} + \sigma_a n(t)) Xe_{\text{ref}} Xe_{\text{norm}}(t)}{Xe_{\text{ref}}}$$
+
+---
+
+### 2. Numerical Discretization and Solver Methods
+
+To run efficiently on FPGA hardware without sacrificing numerical stability, different integration methods are used:
+
+#### Point Kinetics Solver (Semi-Implicit Euler)
+Because prompt point-kinetics equations are highly stiff (due to prompt lifetime $L \approx 2 \times 10^{-5}$ seconds), standard explicit Euler would require sub-nanosecond timesteps. Instead, a **semi-implicit Euler discretization** is used:
+- Precursors are integrated explicitly:
+  $$C_i(t + h) = C_i(t) + h \left[ \frac{\beta_i}{L} n(t) - \lambda_i C_i(t) \right]$$
+- Prompt power is solved semi-implicitly:
+  $$n(t + h) = \frac{n(t) + h \left[ \sum_{i=1}^6 \lambda_i C_i(t) + Q \right]}{1 - h \frac{\rho(t + h) - \beta}{L}}$$
+This formulation is unconditionally stable for negative reactivity insertions and preserves prompt-jump kinetics.
+
+#### Thermal & Decay Heat Solver (Explicit Euler)
+Thermal temperatures ($T_f, T_c$) and decay groups ($D_j$) are integrated using standard **explicit Euler integration**:
+$$T_f(t + h) = T_f(t) + h \frac{dT_f}{dt}$$
+$$T_c(t + h) = T_c(t) + h \frac{dT_c}{dt}$$
+$$D_j(t + h) = D_j(t) + h \frac{dD_j}{dt}$$
+
+#### Poison Solver (Analytical Exponential Batch Update)
+To prevent floating-point underflow at long timescales during shutdowns, Iodine and Xenon ratios are updated analytically over each output frame interval $\Delta t = h \cdot \text{substeps}$:
+- **Iodine-135:**
+  $$I_{\text{norm}}(t + \Delta t) = I_{\text{norm}}(t) + (n_{\text{avg}} - I_{\text{norm}}(t)) \left( 1 - e^{-\lambda_I \Delta t} \right)$$
+- **Xenon-135:**
+  $$Xe_{\text{norm}}(t + \Delta t) = Xe_{\text{norm}}(t) + (Xe_{\text{eq, norm}} - Xe_{\text{norm}}(t)) \left( 1 - e^{-\text{sink} \cdot \Delta t} \right)$$
+  where:
+  - $\text{sink} = \lambda_{Xe} + \sigma_a n_{\text{avg}}$
+  - $Xe_{\text{eq, norm}} = \frac{\gamma_{Xe} \Sigma_f n_{\text{avg}} + \lambda_I I_{\text{ref}} I_{\text{norm}}(t + \Delta t)}{\text{sink} \cdot Xe_{\text{ref}}}$
+
 ## Native regression tests
 
 From the repository root, build with strict warnings and run both suites:

@@ -152,9 +152,9 @@ inline PlantConfig plant_config(int mode) {
         cfg.gamma_c_active = 0.357142857f;
 
         // Rod worth:
-        // critical rod position = 0.084 / (0.084 + 0.0049) ≈ 0.9449
-        cfg.rho_rod_min = -0.084f;   // -12 dollars
-        cfg.rho_rod_max =  0.0049f;  // +0.7 dollars, below prompt critical
+        // critical rod position = 0.00735 / (0.00735 + 0.00245) = 0.75
+        cfg.rho_rod_min = -0.00735f;  // -1.05 $
+        cfg.rho_rod_max =  0.00245f;  // +0.35 $
 
     } else if (selected_mode == 1) {
         // ------------------------------------------------------------
@@ -187,8 +187,8 @@ inline PlantConfig plant_config(int mode) {
         cfg.gamma_c_init = 0.357142857f;
         cfg.gamma_c_active = 0.02f;
 
-        cfg.rho_rod_min = -0.084f;
-        cfg.rho_rod_max =  0.0049f;
+        cfg.rho_rod_min = -0.00735f;  // -1.05 $
+        cfg.rho_rod_max =  0.00245f;  // +0.35 $
     }
 
     cfg.kXe_worth = -0.025f;
@@ -217,6 +217,9 @@ struct ReactorState {
     float rod_target;
     float rod_motion_residual;
     int plant_mode;
+    bool scram_occurred;
+    bool scram_active;
+    float t_scram;
 };
 
 inline float rod_rho(const ReactorState& state, const PlantConfig& cfg) {
@@ -232,10 +235,54 @@ inline float xenon_rho(const ReactorState& state, const PlantConfig& cfg) {
 }
 
 inline float total_rho(const ReactorState& state, const PlantConfig& cfg) {
-    return rod_rho(state, cfg) +
-           cfg.alpha_f * (state.Tf - state.Tf_ref) +
-           cfg.alpha_c * (state.Tc - state.Tc_ref) +
-           xenon_rho(state, cfg);
+    const float rho_rod = rod_rho(state, cfg);
+    const float rho_fuel = cfg.alpha_f * (state.Tf - state.Tf_ref);
+    const float rho_cool = cfg.alpha_c * (state.Tc - state.Tc_ref);
+    const float rho_xe = xenon_rho(state, cfg);
+
+    float rho_total = rho_rod + rho_fuel + rho_cool + rho_xe;
+
+    if (state.scram_active) {
+        const float rho_scram_extra = -0.07665f;  // about -10.95$
+        rho_total += rho_scram_extra;
+    }
+
+    return rho_total;
+}
+
+inline void update_poison_batched(
+    float N_avg,
+    float poison_dt,
+    const ReactorParams& params,
+    float& I_norm,
+    float& Xe_norm
+) {
+    // Reference equilibrium at N = 1.0
+    const float I_ref = (params.gamma_I * params.kFission) / params.lambda_I;
+    const float Xe_ref = (params.gamma_Xe * params.kFission + params.lambda_I * I_ref)
+                         / (params.lambda_Xe + params.kXe_burnout);
+
+    // Iodine normalized update
+    float I_eq = N_avg;
+    float I_factor = 1.0f - expf(-params.lambda_I * poison_dt);
+    I_norm += (I_eq - I_norm) * I_factor;
+
+    // Xenon normalized update
+    float Xe_source = params.gamma_Xe * params.kFission * N_avg +
+                      params.lambda_I * I_ref * I_norm;
+    float Xe_sink = params.lambda_Xe + params.kXe_burnout * N_avg;
+
+    float Xe_eq_norm = (Xe_source / Xe_sink) / Xe_ref;
+    float Xe_factor = 1.0f - expf(-Xe_sink * poison_dt);
+
+    Xe_norm += (Xe_eq_norm - Xe_norm) * Xe_factor;
+
+    if (!finite(I_norm) || I_norm < 0.0f) {
+        I_norm = 0.0f;
+    }
+    if (!finite(Xe_norm) || Xe_norm < 0.0f) {
+        Xe_norm = 0.0f;
+    }
 }
 
 inline void reset(ReactorState& state, const ReactorParams& params,
@@ -264,12 +311,16 @@ inline void reset(ReactorState& state, const ReactorParams& params,
     state.Tf = state.Tc + (params.K_heat * state.n) / params.gamma;
     state.Tf_ref = state.Tf;
 
-    const float fission_rate = params.kFission * state.n;
-    state.I_Xe = (params.gamma_I * fission_rate) / params.lambda_I;
-    const float xe_source =
-        params.gamma_Xe * fission_rate + params.lambda_I * state.I_Xe;
-    const float xe_sink = params.lambda_Xe + params.kXe_burnout * state.n;
-    state.Xe = xe_sink > 1.0e-12f ? xe_source / xe_sink : 0.0f;
+    const float I_ref = (params.gamma_I * params.kFission) / params.lambda_I;
+    const float Xe_ref = (params.gamma_Xe * params.kFission + params.lambda_I * I_ref)
+                         / (params.lambda_Xe + params.kXe_burnout);
+
+    float Xe_source = params.gamma_Xe * params.kFission * power_fraction +
+                      params.lambda_I * I_ref * power_fraction;
+    float Xe_sink = params.lambda_Xe + params.kXe_burnout * power_fraction;
+
+    state.I_Xe = power_fraction;
+    state.Xe = (Xe_source / Xe_sink) / Xe_ref;
     state.Xe_ref = state.Xe;
 
     state.decay_heat = 0.0f;
@@ -277,15 +328,28 @@ inline void reset(ReactorState& state, const ReactorParams& params,
         state.decay_group[i] = params.decay_fraction[i] * state.n;
         state.decay_heat += state.decay_group[i];
     }
+    state.scram_occurred = false;
+    state.scram_active = false;
+    state.t_scram = 0.0f;
 }
 
 inline void scram(ReactorState& state) {
     state.rod_position = 0.0f;
     state.rod_target = 0.0f;
     state.rod_motion_residual = 0.0f;
+    state.scram_active = true;
+    state.scram_occurred = true;
+    state.t_scram = state.t;
+}
+
+inline void reset_scram_trip(ReactorState& state) {
+    state.scram_active = false;
 }
 
 inline void set_rod_target(ReactorState& state, float target) {
+    if (state.scram_active) {
+        return;
+    }
     if (finite(target)) {
         state.rod_target = clamp(target, 0.0f, 1.0f);
     }
@@ -359,20 +423,10 @@ inline void step(ReactorState& state, const ReactorParams& params, float h) {
     const float dTcdt =
         params.gamma * (state.Tf - state.Tc) -
         cfg.gamma_c_active * (state.Tc - params.Tm_const);
-    const float fission_rate = params.kFission * n_old;
-    const float dIdt =
-        params.gamma_I * fission_rate - params.lambda_I * state.I_Xe;
-    const float dXedt =
-        params.gamma_Xe * fission_rate + params.lambda_I * state.I_Xe -
-        params.lambda_Xe * state.Xe -
-        params.kXe_burnout * n_old * state.Xe;
-
     // Apply one semi-implicit kinetics step and explicit auxiliary updates.
     state.n = (n_old + h * (sum_lam_C + params.Q)) / n_denom;
     state.Tf += h * dTfdt;
     state.Tc += h * dTcdt;
-    state.I_Xe += h * dIdt;
-    state.Xe += h * dXedt;
     for (int i = 0; i < PRECURSOR_GROUPS; ++i) {
         state.C[i] += h * dCdt[i];
     }
@@ -382,12 +436,6 @@ inline void step(ReactorState& state, const ReactorParams& params, float h) {
     }
     if (state.n > 1.0e12f) {
         state.n = 1.0e12f;
-    }
-    if (!finite(state.I_Xe) || state.I_Xe < 0.0f) {
-        state.I_Xe = 0.0f;
-    }
-    if (!finite(state.Xe) || state.Xe < 0.0f) {
-        state.Xe = 0.0f;
     }
     state.t += h;
 }
@@ -399,12 +447,17 @@ inline int bounded_substeps(int requested) {
 inline void advance(ReactorState& state, const ReactorParams& params,
                     float h, int requested_substeps) {
     const int count = bounded_substeps(requested_substeps);
+    float n_sum = 0.0f;
     for (int i = 0; i < MAX_SUBSTEPS; ++i) {
         if (i >= count) {
             break;
         }
+        n_sum += state.n;
         step(state, params, h);
     }
+    float poison_dt = h * (float)count;
+    float N_avg = n_sum / (float)count;
+    update_poison_batched(N_avg, poison_dt, params, state.I_Xe, state.Xe);
 }
 
 } // namespace pk

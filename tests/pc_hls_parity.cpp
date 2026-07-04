@@ -10,19 +10,20 @@ struct Outputs {
     float t, n, tf, tc, iodine, xenon, rho, dollars, rho_xe;
     float rod_position, rod_target, factor, order, target_h, decay, plant;
     float precursors[6];
+    float scram_active;
 };
 
 void call_top(float h, int substeps, float reset, float reset_power,
               float withdraw, float insert, float scram,
               float set_target, float target, int plant, float plant_update,
-              Outputs& out) {
+              float clear_scram, Outputs& out) {
     point_kinetics_step(
         h, substeps, 1.0f, reset, reset_power, withdraw, insert, scram,
         &out.t, &out.n, &out.tf, &out.tc, &out.iodine, &out.xenon,
         &out.rho, &out.dollars, &out.rho_xe, &out.rod_position,
         &out.rod_target, &out.factor, &out.order, out.precursors,
         set_target, target, plant, plant_update, &out.target_h,
-        &out.decay, &out.plant);
+        &out.decay, &out.plant, clear_scram, &out.scram_active);
 }
 
 bool near(float a, float b, float tolerance = 2.0e-5f) {
@@ -54,6 +55,7 @@ int compare(const pk::ReactorState& state, const Outputs& out,
     CHECK(rod_target, state.rod_target);
     CHECK(decay, state.decay_heat);
     CHECK(plant, static_cast<float>(state.plant_mode));
+    CHECK(scram_active, static_cast<float>(state.scram_active));
     for (int i = 0; i < 6; ++i) {
         if (!near(out.precursors[i], state.C[i])) {
             ++failures;
@@ -74,7 +76,7 @@ int main() {
 
     pk::reset(core, params, 1.0f, 0);
     pk::advance(core, params, h, 100);
-    call_top(h, 100, 1.0f, 1.0f, 0, 0, 0, 0, 0, 0, 0, out);
+    call_top(h, 100, 1.0f, 1.0f, 0, 0, 0, 0, 0, 0, 0, 0.0f, out);
     failures += compare(core, out, "equilibrium");
     if (!near((1.0f - params.total_decay_fraction()) * core.n +
               core.decay_heat, 1.0f)) {
@@ -85,7 +87,7 @@ int main() {
     pk::set_rod_target(core, core.rod_target + 0.05f);
     pk::advance(core, params, h, 500);
     call_top(h, 500, 0, 1, 0, 0, 0, 1, out.rod_target + 0.05f,
-             0, 0, out);
+             0, 0, 0.0f, out);
     failures += compare(core, out, "rod step");
 
     const float decay_before_scram = core.decay_heat;
@@ -95,22 +97,53 @@ int main() {
         ++failures;
     }
     pk::advance(core, params, 0.002f, 5000);
-    call_top(0.002f, 5000, 0, 1, 0, 0, 1, 0, 0, 0, 0, out);
+    call_top(0.002f, 5000, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0.0f, out);
     failures += compare(core, out, "SCRAM");
     if (!(core.decay_heat > 0.0f && core.decay_heat < decay_before_scram)) {
         std::cerr << "FAIL SCRAM: decay heat must be positive and decreasing\n";
         ++failures;
     }
 
+    // SCRAM Latching scenarios:
+    // 1. Verify target remains 0 and cannot be changed while SCRAM is active.
+    pk::set_rod_target(core, 0.5f);
+    pk::advance(core, params, 0.002f, 1);
+    call_top(0.002f, 1, 0, 1, 0, 0, 0, 1, 0.5f, 0, 0, 0.0f, out);
+    failures += compare(core, out, "rod Target rejected when scram active");
+    if (!near(core.rod_target, 0.0f) || !near(out.rod_target, 0.0f)) {
+        std::cerr << "FAIL scram latch: rod target was allowed to withdraw under active scram\n";
+        ++failures;
+    }
+
+    // 2. Clear scram trip.
+    pk::reset_scram_trip(core);
+    pk::advance(core, params, 0.002f, 1);
+    call_top(0.002f, 1, 0, 1, 0, 0, 0, 0, 0.0f, 0, 0, 1.0f, out);
+    failures += compare(core, out, "clear scram");
+    if (core.scram_active || out.scram_active > 0.5f) {
+        std::cerr << "FAIL clear scram: scram_active remained active\n";
+        ++failures;
+    }
+
+    // 3. rod controls work again post-clear.
+    pk::set_rod_target(core, 0.5f);
+    pk::advance(core, params, 0.002f, 1);
+    call_top(0.002f, 1, 0, 1, 0, 0, 0, 1, 0.5f, 0, 0, 0.0f, out);
+    failures += compare(core, out, "rod target accepted after clear");
+    if (!near(core.rod_target, 0.5f) || !near(out.rod_target, 0.5f)) {
+        std::cerr << "FAIL rod control: target did not update after clear scram\n";
+        ++failures;
+    }
+
     pk::reset(core, params, 0.75f, 0);
     pk::advance(core, params, h, 1);
-    call_top(h, 1, 1, 0.75f, 0, 0, 0, 0, 0, 0, 0, out);
+    call_top(h, 1, 1, 0.75f, 0, 0, 0, 0, 0, 0, 0, 0.0f, out);
     failures += compare(core, out, "reset");
 
     for (int mode = 0; mode < 3; ++mode) {
         pk::reset(core, params, 1.0f, mode);
         pk::advance(core, params, h, 10);
-        call_top(h, 10, 0, 1, 0, 0, 0, 0, 0, mode, 1, out);
+        call_top(h, 10, 0, 1, 0, 0, 0, 0, 0, mode, 1, 0.0f, out);
         failures += compare(core, out, "plant mode");
         if (!std::isfinite(core.n) || core.n < 0.0f) {
             ++failures;
@@ -120,7 +153,7 @@ int main() {
     // Non-finite controls must not poison state or overwrite the rod target.
     const float old_target = core.rod_target;
     call_top(std::numeric_limits<float>::quiet_NaN(), 1, 0, 1, 0, 0, 0,
-             1, std::numeric_limits<float>::infinity(), 2, 0, out);
+             1, std::numeric_limits<float>::infinity(), 2, 0, 0.0f, out);
     if (!std::isfinite(out.n) || !near(out.rod_target, old_target) ||
         !near(out.target_h, pk::TimePolicy::base_h())) {
         std::cerr << "FAIL non-finite command validation\n";

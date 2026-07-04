@@ -48,6 +48,8 @@
 #define PK_TARGET_H_OUT 0x1a0u
 #define PK_DECAY_OUT    0x1b0u
 #define PK_PLANT_OUT    0x1c0u
+#define PK_CLEAR_SCRAM   0x1d0u
+#define PK_SCRAM_ACTIVE  0x1d8u
 
 #define MODE_REALTIME_H     0.00001f
 #define MODE_TRAINING_H     0.0001f
@@ -64,6 +66,7 @@ typedef struct {
     int withdraw_pulse;
     int insert_pulse;
     int scram_pulse;
+    int clear_scram_pulse;
     int set_rod_target;
     float rod_target;
     int plant_mode;
@@ -254,7 +257,8 @@ static void print_data_row(float t,
                            float target_h,
                            float step_real_time,
                            float decay_heat,
-                           float plant_mode)
+                           float plant_mode,
+                           float scram_active)
 {
     print_csv_value(t); xil_printf(",");
     print_csv_value(n); xil_printf(",");
@@ -272,7 +276,9 @@ static void print_data_row(float t,
     print_precise_csv_value(target_h); xil_printf(",");
     print_precise_csv_value(step_real_time); xil_printf(",");
     print_csv_value(decay_heat); xil_printf(",");
-    print_csv_value(plant_mode); xil_printf("\r\n");
+    print_csv_value(plant_mode); xil_printf(",");
+    xil_printf("0.0,0.0,0.0,0.0,0.75,");
+    print_csv_value(scram_active); xil_printf("\r\n");
 }
 
 static int steps_per_output(float h, float tc_factor)
@@ -317,6 +323,8 @@ static void apply_command(const char *cmd, AppState *state)
         state->insert_pulse = 1;
     } else if ((ch == 'R') || (ch == 'r')) {
         state->scram_pulse = 1;
+    } else if ((ch == 'K') || (ch == 'k')) {
+        state->clear_scram_pulse = 1;
     } else if ((ch == 'W') || (ch == 'w')) {
         if (parse_float_arg(cmd + 1, &value) && finite_float(value)) {
             state->rod_target = clamp_float(value, 0.0f, 1.0f);
@@ -401,6 +409,7 @@ int main()
     state.withdraw_pulse = 0;
     state.insert_pulse = 0;
     state.scram_pulse = 0;
+    state.clear_scram_pulse = 0;
     state.set_rod_target = 0;
     state.rod_target = 0.0f;
     state.plant_mode = 0;
@@ -434,6 +443,7 @@ int main()
         pk_write_float(PK_WITHDRAW, withdraw);
         pk_write_float(PK_INSERT, insert);
         pk_write_float(PK_SCRAM, scram);
+        pk_write_float(PK_CLEAR_SCRAM, state.clear_scram_pulse ? 1.0f : 0.0f);
         pk_write_float(PK_SET_ROD_TGT, state.set_rod_target ? 1.0f : 0.0f);
         pk_write_float(PK_ROD_TGT_CMD, state.rod_target);
         pk_write_int(PK_PLANT_MODE, state.plant_mode);
@@ -459,17 +469,19 @@ int main()
         float target_h = pk_read_float(PK_TARGET_H_OUT);
         float decay_heat = pk_read_float(PK_DECAY_OUT);
         float plant_mode = pk_read_float(PK_PLANT_OUT);
+        float scram_active = pk_read_float(PK_SCRAM_ACTIVE);
         float step_real_time = elapsed_seconds(start_time, end_time) / (float)state.substeps;
 
         print_data_row(t, n, Tf, rho, dollars, Tc, I_Xe, Xe,
                        rho_Xe, tc_factor_out, rod_position, rod_target,
                        engine_order, target_h, step_real_time,
-                       decay_heat, plant_mode);
+                       decay_heat, plant_mode, scram_active);
 
         state.reset = 0;
         state.withdraw_pulse = 0;
         state.insert_pulse = 0;
         state.scram_pulse = 0;
+        state.clear_scram_pulse = 0;
         state.set_rod_target = 0;
         state.plant_update = 0;
 

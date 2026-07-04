@@ -66,6 +66,8 @@ void run_simulation_host(ReactorSim& sim, float wall_output_interval) {
                     }
                 } else if (code == 'R' || code == 'r') {
                     sim.scram();
+                } else if (code == 'K' || code == 'k') {
+                    sim.reset_scram_trip();
                 } else if (code == 'P' || code == 'p') {
                     std::istringstream stream(command.substr(1));
                     float power = 1.0f;
@@ -157,7 +159,8 @@ void run_simulation_host(ReactorSim& sim, float wall_output_interval) {
                   << sim.decay_heat << ',' << sim.plant_mode << ','
                   << rho_rod_dlr << ',' << rho_fuel_dlr << ','
                   << rho_coolant_dlr << ','
-                  << rho_xenon_dlr << ',' << rod_critical << std::endl;
+                  << rho_xenon_dlr << ',' << rod_critical << ','
+                  << static_cast<float>(sim.scram_active) << std::endl;
 
         const Clock::time_point now = Clock::now();
         if (now < next_deadline) {
