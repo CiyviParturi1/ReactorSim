@@ -1156,7 +1156,7 @@
       },
       "point_kinetics_step_0": {
         "vlnv": "xilinx.com:hls:point_kinetics_step:1.0",
-        "ip_revision": "2114626632",
+        "ip_revision": "2114682029",
         "xci_name": "system_point_kinetics_step_0_0",
         "xci_path": "ip\\system_point_kinetics_step_0_0\\system_point_kinetics_step_0_0.xci",
         "inst_hier_path": "point_kinetics_step_0",

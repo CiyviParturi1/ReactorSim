@@ -7,15 +7,15 @@ import threading
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SOURCE_FILE = os.path.join(BASE_DIR, "taylor_solver.cpp")
+SOURCE_FILE = os.path.join(BASE_DIR, "pc_solver.cpp")
 PLOTTER_FILE = os.path.join(BASE_DIR, "plot_realtime.py")
 COMMAND_PREFIX = "PLOTTER_CMD\t"
 DEFAULT_WINDOW = "6h"
 
 if platform.system() == "Windows":
-    EXECUTABLE = os.path.join(BASE_DIR, "taylor_solver.exe")
+    EXECUTABLE = os.path.join(BASE_DIR, "pc_solver.exe")
 else:
-    EXECUTABLE = os.path.join(BASE_DIR, "taylor_solver")
+    EXECUTABLE = os.path.join(BASE_DIR, "pc_solver")
 
 
 def compile_solver():
@@ -27,9 +27,15 @@ def compile_solver():
     print(f"[Build] Compiling {SOURCE_FILE}...", file=sys.stderr)
 
     if platform.system() == "Windows":
-        cmd = ["g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17"]
+        cmd = [
+            "g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17",
+            "-O2", "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+        ]
     else:
-        cmd = ["g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17", "-pthread"]
+        cmd = [
+            "g++", "-o", EXECUTABLE, SOURCE_FILE, "-std=c++17", "-pthread",
+            "-O2", "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+        ]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -40,7 +46,7 @@ def compile_solver():
         print(f"[Build] Compilation FAILED:\n{result.stderr}", file=sys.stderr)
         if "Permission denied" in result.stderr and platform.system() == "Windows":
             print(
-                "[Build] taylor_solver.exe is probably still running. Close the plot/simulator "
+                "[Build] pc_solver.exe is probably still running. Close the plot/simulator "
                 "window or kill the old process, then rerun.",
                 file=sys.stderr,
             )
@@ -97,8 +103,8 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if not args.skip_build and not compile_solver() and not os.path.exists(args.executable):
-        print("Aborting: Could not build and no executable found.", file=sys.stderr)
+    if not args.skip_build and not compile_solver():
+        print("Aborting: build failed; refusing to run a stale executable.", file=sys.stderr)
         return 1
 
     if not os.path.exists(args.executable):

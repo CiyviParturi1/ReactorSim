@@ -1,0 +1,34 @@
+---
+description: Keep short C/C++ statements and signatures on one line
+globs: "**/*.{c,h,cpp,hpp}"
+alwaysApply: false
+---
+
+# One-line short statements
+
+Prefer one line when a statement, call, or signature is short and still easy to read. Do not split a short sentence across lines.
+
+Wrap only when the line is genuinely long (many parameters, long expressions, or hard to scan). Keep long function signatures and calls on multiple lines when they clearly cannot fit on one line.
+
+```cpp
+// BAD
+measured_wall_interval =
+    std::chrono::duration<double>(frame_start - previous_frame_start).count();
+
+compensated_add(
+    (Xe_eq_norm - Xe_norm) * Xe_factor, Xe_norm, Xe_compensation);
+
+// GOOD
+measured_wall_interval = std::chrono::duration<double>(frame_start - previous_frame_start).count();
+
+compensated_add((Xe_eq_norm - Xe_norm) * Xe_factor, Xe_norm, Xe_compensation);
+
+// OK to wrap (too long for one line)
+void point_kinetics_step(
+    float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
+    float withdraw_cmd, float insert_cmd, float scram_cmd,
+    ...
+);
+```
+
+Do not merge preprocessor macros (`\` continuations). Do not change behavior or add a project auto-formatter for this.

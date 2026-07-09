@@ -27,15 +27,8 @@ close $input
 regsub -line {^set origin_dir ".*"$} $data \
     {set origin_dir [file normalize [file join [file dirname [info script]] ..]]} data
 set board_setup {# Locate the ZedBoard definition without embedding a username.
-set board_repo ""
-if {[info exists ::env(PK_BOARD_REPO)]} {
-  set board_repo [file normalize $::env(PK_BOARD_REPO)]
-} elseif {[info exists ::env(APPDATA)]} {
-  set candidate [file normalize [file join $::env(APPDATA) Xilinx Vivado 2025.2 xhub board_store xilinx_board_store]]
-  if {[file isdirectory $candidate]} {
-    set board_repo $candidate
-  }
-}
+source [file join [file dirname [info script]] common_board_repo.tcl]
+set board_repo [pk_board_repo_path]
 if {$board_repo ne ""} {
   set_property -name "board_part_repo_paths" -value $board_repo -objects $obj
 }
@@ -43,7 +36,18 @@ if {$board_repo ne ""} {
 regsub -line {^set_property -name "board_part_repo_paths".*\n} $data $board_setup data
 
 regsub {(?s)#call make_wrapper.*?\n\n\n# Set 'sources_1' fileset file properties} $data \
-    {# Create the HDL wrapper from the block design.
+    {# Refresh the imported block design against the packaged HLS IP before
+# generating its wrapper. A changed HLS implementation keeps VLNV 1.0 but
+# increments the catalog revision, which otherwise leaves the BD locked.
+open_bd_design [get_files -norecurse system.bd]
+set hls_ip [get_ips -quiet system_point_kinetics_step_0_0]
+if {$hls_ip ne ""} {
+  upgrade_ip $hls_ip
+}
+validate_bd_design
+save_bd_design
+
+# Create the HDL wrapper from the block design.
 set wrapper_path [make_wrapper -fileset sources_1 -files [get_files -norecurse system.bd] -top]
 add_files -norecurse -fileset sources_1 $wrapper_path
 

@@ -1,138 +1,113 @@
 #ifndef POINT_KINETICS_H
 #define POINT_KINETICS_H
 
-float euler_update(float y, float dydt, float h);
-float clamp_value(float value, float low, float high);
+#include "../../common/point_kinetics_core.h"
 
-struct ReactorParams {
-    float Lambda;
-    float beta_total;
-    float Q;
-
-    float lam_i[6];
-    float beta_i[6];
-
-    float gamma;
-    float K_heat;
-    float Tm_const;
-
-    float Tc_ref;
-    float Tf_ref;
-
-    float gamma_I;
-    float gamma_Xe;
-    float lambda_I;
-    float lambda_Xe;
-    float kXe_burnout;
-    float kFission;
-
-    ReactorParams();
-};
-
-struct PlantConfig {
-    int mode_id;
-    const char *name;
-    float alpha_f;
-    float alpha_c;
-    float gamma_c_init;
-    float gamma_c_active;
-    float rho_rod_min;
-    float rho_rod_max;
-    float kXe_worth;
-};
+using ReactorParams = pk::ReactorParams;
+using PlantConfig = pk::PlantConfig;
 
 enum class TimeMode {
-    REALTIME,
-    TRAINING,
-    XENON,
-    CUSTOM
+    REALTIME, TRAINING, XENON, CUSTOM
 };
 
+/* Maps a speed-up factor to a physics step size h. */
 struct TimeCompression {
     TimeMode mode;
     float factor;
+    static constexpr float BASE_H = PK_BASE_H;
+    static constexpr float MAX_H = PK_MAX_H;
 
-    static constexpr float BASE_H = 0.00001f;
-    static constexpr float MAX_H  = 0.002f;
+    TimeCompression() : mode(TimeMode::REALTIME), factor(1.0f) {}
 
-    TimeCompression();
-    void set_mode(TimeMode m);
-    void set_custom(float f);
-    float h() const;
-    const char* name() const;
+    void set_mode(TimeMode value) {
+        mode = value;
+        switch (value) {
+            case TimeMode::TRAINING:
+                factor = 10.0f;
+                break;
+            case TimeMode::XENON:
+                factor = 1000.0f;
+                break;
+            default:
+                factor = 1.0f;
+                break;
+        }
+    }
+
+    void set_custom(float value) {
+        mode = TimeMode::CUSTOM;
+        factor = pk::finite(value) && value >= 1.0f ? value : 1.0f;
+    }
+
+    float h() const {
+        return pk::TimePolicy::step_for_factor(factor);
+    }
+
+    const char* name() const {
+        switch (mode) {
+            case TimeMode::TRAINING:
+                return "TRAINING(10x)";
+            case TimeMode::XENON:
+                return "XENON(1000x)";
+            case TimeMode::CUSTOM:
+                return "CUSTOM";
+            default:
+                return "REALTIME(1x)";
+        }
+    }
 };
 
-class ReactorSim {
+/* PC / testbench wrapper around the shared ReactorState. */
+class ReactorSim : public pk::ReactorState {
 public:
     ReactorParams p;
     TimeCompression tc;
-    int engine_order;
+    int engine_order;  /* CSV field: 1 = ok, 0 = numerical trip */
 
-    float t;
-    float n;
-    float C[6];
-    float Tf;
-    float Tc;
-    float I_Xe;
-    float Xe;
-    float Xe_ref;
-    float decay_heat;
+    ReactorSim() : engine_order(1) {
+        plant_mode = 0;
+        initialize(1.0f);
+    }
 
-    float rod_position;
-    float rod_target;
-    float rod_speed_limit;
-    float rod_motion_residual;
-    bool scram_occurred;
-    float t_scram;
-    float pre_scram_power;
+    void initialize(float power) {
+        pk::reset(*this, p, power, plant_mode);
+    }
 
-    int plant_mode;
-    PlantConfig plant_configs[3];
+    float get_xe_rho(const PlantConfig& cfg) const {
+        return pk::xenon_rho(*this, cfg);
+    }
 
-    ReactorSim();
-    void initialize(float power_fraction);
-    float get_rod_rho(const PlantConfig& cfg) const;
-    float get_xe_rho(const PlantConfig& cfg) const;
-    float get_total_rho(const PlantConfig& cfg) const;
-    float get_total_rho() const;
-    void scram();
-    void step(float h);
+    float get_total_rho(const PlantConfig& cfg) const {
+        return pk::total_rho(*this, cfg);
+    }
+
+    float get_total_rho() const {
+        return pk::total_rho(*this, pk::plant_config(plant_mode));
+    }
+
+    void scram() {
+        pk::scram(*this);
+    }
+
+    void reset_scram_trip() {
+        pk::reset_scram_trip(*this);
+    }
+
+    void step(float h) {
+        pk::advance(*this, p, h, 1);
+    }
 };
 
-#ifndef __SYNTHESIS__
-void run_simulation_host(ReactorSim& sim, float wall_output_interval);
-#endif
-
-void point_kinetics_step(
-    float h,
-    int substeps,
-    float tc_factor,
-    float reset,
-    float reset_power,
-    float withdraw_cmd,
-    float insert_cmd,
-    float scram_cmd,
-    float *t_out,
-    float *N_out,
-    float *Tf_out,
-    float *Tc_out,
-    float *I_Xe_out,
-    float *Xe_out,
-    float *rho_out,
-    float *dollars_out,
-    float *rho_Xe_out,
-    float *rod_position_out,
-    float *rod_target_out,
-    float *tc_factor_out,
-    float *engine_order_out,
-    float C_out[6],
-    float set_rod_target_cmd,
-    float rod_target_cmd,
-    int plant_mode_cmd,
-    float plant_mode_update_cmd,
-    float *target_h_out,
-    float *decay_heat_out,
-    float *plant_mode_out
-);
+/* HLS top: one AXI-Lite call advances the persistent FPGA state. */
+void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
+    float withdraw_cmd, float insert_cmd, float scram_cmd,
+    float *t_out, float *N_out, float *Tf_out, float *Tc_out,
+    float *I_Xe_out, float *Xe_out, float *rho_out, float *dollars_out,
+    float *rho_Xe_out, float *rod_position_out, float *rod_target_out,
+    float *tc_factor_out, float *engine_order_out, float C_out[6],
+    float set_rod_target_cmd, float rod_target_cmd, int plant_mode_cmd,
+    float plant_mode_update_cmd, float *target_h_out,
+    float *decay_heat_out, float *plant_mode_out,
+    float clear_scram_cmd, float *scram_active_out);
 
 #endif
