@@ -27,15 +27,8 @@ close $input
 regsub -line {^set origin_dir ".*"$} $data \
     {set origin_dir [file normalize [file join [file dirname [info script]] ..]]} data
 set board_setup {# Locate the ZedBoard definition without embedding a username.
-set board_repo ""
-if {[info exists ::env(PK_BOARD_REPO)]} {
-  set board_repo [file normalize $::env(PK_BOARD_REPO)]
-} elseif {[info exists ::env(APPDATA)]} {
-  set candidate [file normalize [file join $::env(APPDATA) Xilinx Vivado 2025.2 xhub board_store xilinx_board_store]]
-  if {[file isdirectory $candidate]} {
-    set board_repo $candidate
-  }
-}
+source [file join [file dirname [info script]] common_board_repo.tcl]
+set board_repo [pk_board_repo_path]
 if {$board_repo ne ""} {
   set_property -name "board_part_repo_paths" -value $board_repo -objects $obj
 }

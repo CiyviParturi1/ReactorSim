@@ -1,7 +1,9 @@
 #include "point_kinetics.h"
 
-void point_kinetics_step(
-    float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
+/* * FPGA entry point. State is static so it survives between AXI calls.
+ * Flow: apply commands → advance physics → write outputs.
+ */
+void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
     float withdraw_cmd, float insert_cmd, float scram_cmd,
     float *t_out, float *N_out, float *Tf_out, float *Tc_out,
     float *I_Xe_out, float *Xe_out, float *rho_out, float *dollars_out,
@@ -44,13 +46,12 @@ void point_kinetics_step(
 #pragma HLS INTERFACE s_axilite port=scram_active_out bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=return bundle=CTRL
 #pragma HLS ARRAY_PARTITION variable=C_out complete dim=1
- 
+
     static bool initialized = false;
     static ReactorParams params;
     static pk::ReactorState state;
- 
-    const bool plant_update = pk::finite(plant_mode_update_cmd) &&
-                              plant_mode_update_cmd > 0.5f;
+
+    const bool plant_update = pk::finite(plant_mode_update_cmd) && plant_mode_update_cmd > 0.5f;
     if (!initialized || (pk::finite(reset_cmd) && reset_cmd > 0.5f) || plant_update) {
         const int mode = plant_update ? pk::clamp(plant_mode_cmd, 0, 2)
                                       : (initialized ? state.plant_mode : 0);
@@ -60,13 +61,12 @@ void point_kinetics_step(
 
     if (pk::finite(set_rod_target_cmd) && set_rod_target_cmd > 0.5f) {
         pk::set_rod_target(state, rod_target_cmd);
-    } else if (pk::finite(withdraw_cmd) && withdraw_cmd > 0.5f &&
-               (!pk::finite(insert_cmd) || insert_cmd <= 0.5f)) {
+    } else if (pk::finite(withdraw_cmd) && withdraw_cmd > 0.5f && (!pk::finite(insert_cmd) || insert_cmd <= 0.5f)) {
         pk::set_rod_target(state, state.rod_target + 0.01f);
-    } else if (pk::finite(insert_cmd) && insert_cmd > 0.5f &&
-               (!pk::finite(withdraw_cmd) || withdraw_cmd <= 0.5f)) {
+    } else if (pk::finite(insert_cmd) && insert_cmd > 0.5f && (!pk::finite(withdraw_cmd) || withdraw_cmd <= 0.5f)) {
         pk::set_rod_target(state, state.rod_target - 0.01f);
     }
+
     if (pk::finite(scram_cmd) && scram_cmd > 0.5f) {
         pk::scram(state);
     }
@@ -82,6 +82,7 @@ void point_kinetics_step(
 
     const PlantConfig cfg = pk::plant_config(state.plant_mode);
     const float rho = pk::total_rho(state, cfg);
+
     *t_out = state.t;
     *N_out = state.n;
     *Tf_out = state.Tf;
@@ -93,13 +94,13 @@ void point_kinetics_step(
     *rho_Xe_out = pk::xenon_rho(state, cfg);
     *rod_position_out = state.rod_position;
     *rod_target_out = state.rod_target;
-    *tc_factor_out =
-        pk::finite(tc_factor) && tc_factor >= 1.0f ? tc_factor : 1.0f;
+    *tc_factor_out = pk::finite(tc_factor) && tc_factor >= 1.0f ? tc_factor : 1.0f;
     *engine_order_out = state.numerical_fault ? 0.0f : 1.0f;
     *target_h_out = h;
     *decay_heat_out = state.decay_heat;
     *plant_mode_out = static_cast<float>(state.plant_mode);
     *scram_active_out = state.scram_active ? 1.0f : 0.0f;
+
     for (int i = 0; i < pk::PRECURSOR_GROUPS; ++i) {
 #pragma HLS UNROLL
         C_out[i] = state.C[i];

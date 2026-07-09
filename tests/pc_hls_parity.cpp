@@ -13,16 +13,11 @@ struct Outputs {
     float scram_active;
 };
 
-void call_top(float h, int substeps, float reset, float reset_power,
-              float withdraw, float insert, float scram,
+void call_top(float h, int substeps, float reset, float reset_power, float withdraw, float insert, float scram,
               float set_target, float target, int plant, float plant_update,
               float clear_scram, Outputs& out) {
-    point_kinetics_step(
-        h, substeps, 1.0f, reset, reset_power, withdraw, insert, scram,
-        &out.t, &out.n, &out.tf, &out.tc, &out.iodine, &out.xenon,
-        &out.rho, &out.dollars, &out.rho_xe, &out.rod_position,
-        &out.rod_target, &out.factor, &out.order, out.precursors,
-        set_target, target, plant, plant_update, &out.target_h,
+    point_kinetics_step( h, substeps, 1.0f, reset, reset_power, withdraw, insert, scram, &out.t, &out.n, &out.tf, &out.tc, &out.iodine, &out.xenon,
+        &out.rho, &out.dollars, &out.rho_xe, &out.rod_position, &out.rod_target, &out.factor, &out.order, out.precursors, set_target, target, plant, plant_update, &out.target_h,
         &out.decay, &out.plant, clear_scram, &out.scram_active);
 }
 
@@ -31,8 +26,7 @@ bool near(float a, float b, float tolerance = 2.0e-5f) {
     return std::fabs(a - b) <= tolerance * scale;
 }
 
-int compare(const pk::ReactorState& state, const Outputs& out,
-            const char* scenario) {
+int compare(const pk::ReactorState& state, const Outputs& out, const char* scenario) {
     const PlantConfig cfg = pk::plant_config(state.plant_mode);
     int failures = 0;
 #define CHECK(field, expected) \
@@ -78,16 +72,14 @@ int main() {
     pk::advance(core, params, h, 100);
     call_top(h, 100, 1.0f, 1.0f, 0, 0, 0, 0, 0, 0, 0, 0.0f, out);
     failures += compare(core, out, "equilibrium");
-    if (!near((1.0f - params.total_decay_fraction()) * core.n +
-              core.decay_heat, 1.0f)) {
+    if (!near((1.0f - params.total_decay_fraction()) * core.n + core.decay_heat, 1.0f)) {
         std::cerr << "FAIL equilibrium: thermal power is not normalized\n";
         ++failures;
     }
 
     pk::set_rod_target(core, core.rod_target + 0.05f);
     pk::advance(core, params, h, 500);
-    call_top(h, 500, 0, 1, 0, 0, 0, 1, out.rod_target + 0.05f,
-             0, 0, 0.0f, out);
+    call_top(h, 500, 0, 1, 0, 0, 0, 1, out.rod_target + 0.05f, 0, 0, 0.0f, out);
     failures += compare(core, out, "rod step");
 
     const float decay_before_scram = core.decay_heat;
@@ -166,8 +158,7 @@ int main() {
     const float old_target = core.rod_target;
     call_top(std::numeric_limits<float>::quiet_NaN(), 1, 0, 1, 0, 0, 0,
              1, std::numeric_limits<float>::infinity(), 2, 0, 0.0f, out);
-    if (!std::isfinite(out.n) || !near(out.rod_target, old_target) ||
-        !near(out.target_h, pk::TimePolicy::base_h())) {
+    if (!std::isfinite(out.n) || !near(out.rod_target, old_target) || !near(out.target_h, pk::TimePolicy::base_h())) {
         std::cerr << "FAIL non-finite command validation\n";
         ++failures;
     }

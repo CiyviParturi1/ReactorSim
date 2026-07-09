@@ -9,12 +9,14 @@ flowchart LR
     subgraph COMMON["Canonical model source"]
         CFG["point_kinetics_config.h<br/>timing and plant constants"]
         CORE["point_kinetics_core.h<br/>kinetics, thermal, decay heat,<br/>iodine/xenon, rods and SCRAM"]
+        CHELP["point_kinetics_c.h<br/>C plant/telemetry helpers"]
         CFG --> CORE
+        CFG --> CHELP
     end
 
     subgraph PC["PC simulation path"]
         LAUNCH["pc_sim_launcher.py<br/>build and process relay"]
-        SOLVER["taylor_solver.cpp<br/>frame pacing and commands"]
+        SOLVER["pc_solver.cpp<br/>frame pacing and commands"]
         PLOT["plot_realtime.py<br/>GUI, controls and plots"]
 
         PLOT -- "control commands" --> LAUNCH
@@ -51,12 +53,14 @@ flowchart LR
     SOLVER -. "compiled with" .-> CORE
     HLS -. "synthesized from" .-> CORE
     CFG -. "shared C constants" .-> PS
+    CHELP -. "telemetry helpers" .-> PS
 ```
 
 The PC and FPGA paths execute the same `pk::ReactorState` equations from the
 canonical core. The ARM application does not duplicate the physics solver: it
 selects the timestep and substep count, writes commands to the HLS register
-map, waits for completion, reads outputs, and emits telemetry.
+map, waits for completion, reads outputs, and emits telemetry using shared C
+plant helpers.
 
 One output frame follows this sequence:
 
@@ -99,6 +103,7 @@ flowchart LR
 flowchart LR
     CFG["Shared configuration"]
     CORE["Canonical physics core"]
+    CHELP["C telemetry helpers"]
     HLSTOP["HLS top and configuration"]
     HLSBUILD["Vitis HLS compile/package"]
     IP["Packaged point_kinetics_step IP"]
@@ -111,6 +116,7 @@ flowchart LR
     ELF["pk_app.elf"]
 
     CFG --> CORE
+    CFG --> CHELP
     CORE --> HLSTOP
     HLSTOP --> HLSBUILD --> IP
     IP --> REFRESH --> BD
@@ -118,6 +124,7 @@ flowchart LR
     VIVADO --> BIT
     VIVADO --> XSA
     CFG --> VITIS
+    CHELP --> VITIS
     XSA --> VITIS --> ELF
 
     CORE --> PHYS["physics_regression.cpp<br/>independent RK4 and precision checks"]
@@ -136,8 +143,9 @@ scripts.
 | --- | --- |
 | `point_kinetics_config.h` | Cross-target timing, feedback, rod-worth, SCRAM and decay-heat constants |
 | `point_kinetics_core.h` | Canonical reactor state and numerical update methods |
+| `point_kinetics_c.h` | C plant coefficients and critical-rod helpers for ARM telemetry |
 | `point_kinetics.cpp/.h` | HLS AXI interface and persistent FPGA state |
-| `taylor_solver.cpp` | PC command handling, frame pacing and telemetry |
+| `pc_solver.cpp` | PC command handling, frame pacing and telemetry |
 | `main.c` | ARM control of HLS IP, physical switches, UART and telemetry |
 | `plot_realtime.py` | PC/serial input, controls, plots and status presentation |
 | Vivado block design | PS7, AXI interconnect, HLS accelerator, GPIO, clock and reset integration |

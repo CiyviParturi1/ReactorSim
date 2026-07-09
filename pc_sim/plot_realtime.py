@@ -183,15 +183,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Real-Time Reactor Plotter")
     parser.add_argument(
         "--source",
-        choices=("serial", "stdout", "stdin"),
-        default=None,
+        choices=("serial", "stdout"),
+        default="serial",
         help="Input source: serial reads COM/UART, stdout reads CSV lines piped from a process",
-    )
-    parser.add_argument(
-        "--mode",
-        choices=("serial", "stdout", "stdin", "sim"),
-        default=None,
-        help=argparse.SUPPRESS,
     )
     parser.add_argument("--port", default="COM7", help="Serial port (COMx or /dev/ttyUSBx)")
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate")
@@ -211,19 +205,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def select_source(args):
-    if args.source:
-        return args.source
-    if args.mode == "sim":
-        return "stdout"
-    if args.mode:
-        return args.mode
-    return "serial"
-
-
 def main():
     args = parse_args()
-    source = select_source(args)
+    source = args.source
     sim_finished.clear()
 
     if source == "serial":

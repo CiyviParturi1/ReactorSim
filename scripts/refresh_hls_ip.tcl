@@ -7,6 +7,8 @@ set repo_root [file normalize [file join $script_dir ..]]
 set project_xpr [file join $repo_root vivado pk.xpr]
 set ip_repo [file join $repo_root hls point_kinetics_hls point_kinetics_hls hls impl ip]
 
+source [file join $script_dir common_board_repo.tcl]
+
 if {![file exists $project_xpr]} {
   error "Vivado project not found: $project_xpr"
 }
@@ -14,15 +16,7 @@ if {![file exists [file join $ip_repo component.xml]]} {
   error "Packaged HLS IP not found: $ip_repo"
 }
 
-if {[info exists ::env(PK_BOARD_REPO)]} {
-  set_param board.repoPaths [list [file normalize $::env(PK_BOARD_REPO)]]
-} elseif {[info exists ::env(APPDATA)]} {
-  set board_repo [file normalize [file join \
-      $::env(APPDATA) Xilinx Vivado 2025.2 xhub board_store xilinx_board_store]]
-  if {[file isdirectory $board_repo]} {
-    set_param board.repoPaths [list $board_repo]
-  }
-}
+pk_configure_board_repo
 
 open_project $project_xpr
 set_property ip_repo_paths [file normalize $ip_repo] [get_filesets sources_1]

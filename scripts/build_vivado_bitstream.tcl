@@ -8,15 +8,8 @@ set project_xpr [file join $repo_root vivado pk.xpr]
 set report_dir [file join $repo_root build hardware]
 file mkdir $report_dir
 
-if {[info exists ::env(PK_BOARD_REPO)]} {
-  set_param board.repoPaths [list [file normalize $::env(PK_BOARD_REPO)]]
-} elseif {[info exists ::env(APPDATA)]} {
-  set board_repo [file normalize [file join \
-      $::env(APPDATA) Xilinx Vivado 2025.2 xhub board_store xilinx_board_store]]
-  if {[file isdirectory $board_repo]} {
-    set_param board.repoPaths [list $board_repo]
-  }
-}
+source [file join $script_dir common_board_repo.tcl]
+pk_configure_board_repo
 
 open_project $project_xpr
 reset_run synth_1

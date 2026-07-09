@@ -9,6 +9,7 @@
 #include "sleep.h"
 
 #include "../../../common/point_kinetics_config.h"
+#include "../../../common/point_kinetics_c.h"
 
 #define GPIO_BASEADDR   XPAR_AXI_GPIO_0_BASEADDR
 #define GPIO_CHANNEL    1
@@ -99,53 +100,9 @@ static float u32_to_float(u32 value)
     return cvt.f;
 }
 
-static float clamp_float(float value, float low, float high)
-{
-    if (value < low) return low;
-    if (value > high) return high;
-    return value;
-}
-
-static int finite_float(float value)
-{
-    return (value == value) && (value <= 3.4028234e38f) &&
-           (value >= -3.4028234e38f);
-}
-
-static float plant_alpha_f(int mode)
-{
-    if (mode == 1) return PK_MODE1_ALPHA_F;
-    if (mode == 2) return PK_MODE2_ALPHA_F;
-    return PK_MODE0_ALPHA_F;
-}
-
-static float plant_alpha_c(int mode)
-{
-    if (mode == 1) return PK_MODE1_ALPHA_C;
-    if (mode == 2) return PK_MODE2_ALPHA_C;
-    return PK_MODE0_ALPHA_C;
-}
-
-static float plant_rod_min(int mode)
-{
-    if (mode == 1) return PK_MODE1_RHO_ROD_MIN;
-    if (mode == 2) return PK_MODE2_RHO_ROD_MIN;
-    return PK_MODE0_RHO_ROD_MIN;
-}
-
-static float plant_rod_max(int mode)
-{
-    if (mode == 1) return PK_MODE1_RHO_ROD_MAX;
-    if (mode == 2) return PK_MODE2_RHO_ROD_MAX;
-    return PK_MODE0_RHO_ROD_MAX;
-}
-
 static void set_reference_temperatures(AppState *state)
 {
-    state->tc_ref = PK_TM_CONST +
-        (PK_K_HEAT * state->reset_power) / PK_GAMMA_C_INITIAL;
-    state->tf_ref = state->tc_ref +
-        (PK_K_HEAT * state->reset_power) / PK_FUEL_COUPLING;
+    pk_c_reference_temperatures( state->reset_power, &state->tf_ref, &state->tc_ref);
 }
 
 static void pk_write_float(u32 offset, float value)
@@ -283,9 +240,7 @@ static void print_precise_csv_value(float value)
     print_fixed(value, 9);
 }
 
-static void print_data_row(float t,
-                           float n,
-                           float Tf,
+static void print_data_row(float t, float n, float Tf,
                            float rho,
                            float dollars,
                            float Tc,
@@ -346,7 +301,7 @@ static int steps_per_output(float h, float tc_factor)
 
 static void set_time_factor(AppState *state, float factor, float mode_h)
 {
-    if (!finite_float(factor) || factor < 1.0f) {
+    if (!pk_c_finite(factor) || factor < 1.0f) {
         factor = 1.0f;
     }
 
@@ -362,8 +317,7 @@ static void set_time_factor(AppState *state, float factor, float mode_h)
 
     state->h = mode_h;
     state->substeps = steps_per_output(state->h, factor);
-    state->tc_factor =
-        ((float)state->substeps * state->h) / WALL_OUTPUT_INTERVAL;
+    state->tc_factor = ((float)state->substeps * state->h) / WALL_OUTPUT_INTERVAL;
 }
 
 static void apply_command(const char *cmd, AppState *state)
@@ -380,14 +334,13 @@ static void apply_command(const char *cmd, AppState *state)
     } else if ((ch == 'K') || (ch == 'k')) {
         state->clear_scram_pulse = 1;
     } else if ((ch == 'W') || (ch == 'w')) {
-        if (parse_float_arg(cmd + 1, &value) && finite_float(value)) {
-            state->rod_target = clamp_float(value, 0.0f, 1.0f);
+        if (parse_float_arg(cmd + 1, &value) && pk_c_finite(value)) {
+            state->rod_target = pk_c_clamp(value, 0.0f, 1.0f);
             state->set_rod_target = 1;
         }
     } else if ((ch == 'P') || (ch == 'p')) {
-        if (parse_float_arg(cmd + 1, &value) && finite_float(value) &&
-            (value >= 0.0f)) {
-            state->reset_power = clamp_float(value, 0.0f, 1.5f);
+        if (parse_float_arg(cmd + 1, &value) && pk_c_finite(value) && (value >= 0.0f)) {
+            state->reset_power = pk_c_clamp(value, 0.0f, 1.5f);
             set_reference_temperatures(state);
             state->reset = 1;
         }
@@ -414,8 +367,7 @@ static void apply_command(const char *cmd, AppState *state)
                 return;
         }
     } else if ((ch == 'T') || (ch == 't')) {
-        if (parse_float_arg(cmd + 1, &value) && finite_float(value) &&
-            (value >= 1.0f)) {
+        if (parse_float_arg(cmd + 1, &value) && pk_c_finite(value) && (value >= 1.0f)) {
             set_time_factor(state, value, 0.0f);
         }
     }
@@ -491,13 +443,11 @@ int main()
         {
             float measured_interval = WALL_OUTPUT_INTERVAL;
             if (have_previous_frame) {
-                measured_interval =
-                    elapsed_seconds(previous_frame_start, frame_start_time);
+                measured_interval = elapsed_seconds(previous_frame_start, frame_start_time);
             }
             have_previous_frame = 1;
             if (measured_interval > 0.0f) {
-                state.reported_factor =
-                    ((float)state.substeps * state.h) / measured_interval;
+                state.reported_factor = ((float)state.substeps * state.h) / measured_interval;
             }
             previous_frame_start = frame_start_time;
         }
@@ -540,7 +490,8 @@ int main()
         float rho_Xe = pk_read_float(PK_RHO_XE_OUT);
         float rod_position = pk_read_float(PK_ROD_POS_OUT);
         float rod_target = pk_read_float(PK_ROD_TGT_OUT);
-        float tc_factor_out = pk_read_float(PK_TC_FACT_OUT);
+        /* HLS echoes tc_factor; ARM reports measured wall compression instead. */
+        (void)pk_read_float(PK_TC_FACT_OUT);
         float engine_order = pk_read_float(PK_ENGINE_OUT);
         float target_h = pk_read_float(PK_TARGET_H_OUT);
         float decay_heat = pk_read_float(PK_DECAY_OUT);
@@ -549,26 +500,14 @@ int main()
         float step_real_time = elapsed_seconds(start_time, end_time) / (float)state.substeps;
         int active_mode = (int)plant_mode;
         float beta = PK_BETA_TOTAL;
-        float rho_rod_min = plant_rod_min(active_mode);
-        float rho_rod_max = plant_rod_max(active_mode);
-        float rho_rod = rho_rod_min +
-            rod_position * (rho_rod_max - rho_rod_min);
-        float rho_fuel = plant_alpha_f(active_mode) * (Tf - state.tf_ref);
-        float rho_coolant = plant_alpha_c(active_mode) * (Tc - state.tc_ref);
-        float critical_numerator =
-            -rho_fuel - rho_coolant - rho_Xe - rho_rod_min;
-        float rod_critical = clamp_float(
-            critical_numerator / (rho_rod_max - rho_rod_min),
-            0.0f, 1.0f);
-        tc_factor_out = state.reported_factor;
+        PkPlantCoeffs coeffs = pk_c_plant_coeffs(active_mode);
+        float rho_rod = pk_c_rod_rho(rod_position, &coeffs);
+        float rho_fuel = coeffs.alpha_f * (Tf - state.tf_ref);
+        float rho_coolant = coeffs.alpha_c * (Tc - state.tc_ref);
+        float rod_critical = pk_c_critical_rod_position( Tf, Tc, state.tf_ref, state.tc_ref, rho_Xe, &coeffs);
 
-        print_data_row(t, n, Tf, rho, dollars, Tc, I_Xe, Xe,
-                       rho_Xe, tc_factor_out, rod_position, rod_target,
-                       engine_order, target_h, step_real_time,
-                       decay_heat, plant_mode,
-                       rho_rod / beta, rho_fuel / beta,
-                       rho_coolant / beta, rho_Xe / beta,
-                       rod_critical, scram_active);
+        print_data_row(t, n, Tf, rho, dollars, Tc, I_Xe, Xe, rho_Xe, state.reported_factor, rod_position, rod_target, engine_order, target_h, step_real_time, decay_heat, plant_mode,
+                       rho_rod / beta, rho_fuel / beta, rho_coolant / beta, rho_Xe / beta, rod_critical, scram_active);
 
         state.reset = 0;
         state.withdraw_pulse = 0;
@@ -579,8 +518,7 @@ int main()
         state.plant_update = 0;
 
         XTime_GetTime(&frame_end_time);
-        float frame_elapsed =
-            elapsed_seconds(frame_start_time, frame_end_time);
+        float frame_elapsed = elapsed_seconds(frame_start_time, frame_end_time);
         if (frame_elapsed < WALL_OUTPUT_INTERVAL) {
             usleep((unsigned int)((WALL_OUTPUT_INTERVAL - frame_elapsed) * 1000000.0f));
         }

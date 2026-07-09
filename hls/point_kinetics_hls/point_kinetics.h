@@ -7,17 +7,16 @@ using ReactorParams = pk::ReactorParams;
 using PlantConfig = pk::PlantConfig;
 
 enum class TimeMode {
-    REALTIME,
-    TRAINING,
-    XENON,
-    CUSTOM
+    REALTIME, TRAINING, XENON, CUSTOM
 };
 
+/* Maps a speed-up factor to a physics step size h. */
 struct TimeCompression {
     TimeMode mode;
     float factor;
     static constexpr float BASE_H = PK_BASE_H;
     static constexpr float MAX_H = PK_MAX_H;
+
     TimeCompression() : mode(TimeMode::REALTIME), factor(1.0f) {}
 
     void set_mode(TimeMode value) {
@@ -58,22 +57,20 @@ struct TimeCompression {
     }
 };
 
+/* PC / testbench wrapper around the shared ReactorState. */
 class ReactorSim : public pk::ReactorState {
 public:
     ReactorParams p;
     TimeCompression tc;
-    int engine_order;
+    int engine_order;  /* CSV field: 1 = ok, 0 = numerical trip */
 
     ReactorSim() : engine_order(1) {
         plant_mode = 0;
         initialize(1.0f);
     }
+
     void initialize(float power) {
         pk::reset(*this, p, power, plant_mode);
-    }
-
-    float get_rod_rho(const PlantConfig& cfg) const {
-        return pk::rod_rho(*this, cfg);
     }
 
     float get_xe_rho(const PlantConfig& cfg) const {
@@ -97,14 +94,12 @@ public:
     }
 
     void step(float h) {
-        pk::step(*this, p, h);
-        pk::update_poison_batched(
-            n, h, p, I_Xe, Xe, I_compensation, Xe_compensation);
+        pk::advance(*this, p, h, 1);
     }
 };
 
-void point_kinetics_step(
-    float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
+/* HLS top: one AXI-Lite call advances the persistent FPGA state. */
+void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
     float withdraw_cmd, float insert_cmd, float scram_cmd,
     float *t_out, float *N_out, float *Tf_out, float *Tc_out,
     float *I_Xe_out, float *Xe_out, float *rho_out, float *dollars_out,

@@ -44,6 +44,8 @@ model against a particular reactor.
 - `common/point_kinetics_config.h` — constants shared by C++, HLS, and ARM.
 - `common/point_kinetics_core.h` — canonical allocation-free physics core used
   by the PC simulator and HLS top function.
+- `common/point_kinetics_c.h` — C helpers for ARM telemetry that mirror the
+  core plant coefficients and critical-rod formulas.
 - `tests/` — native PC-to-HLS parity and regression scenarios.
 - `scripts/refresh_hls_ip.tcl` — refreshes the packaged HLS IP in Vivado.
 - `scripts/build_vivado_bitstream.tcl` — builds the bitstream, enforces setup
@@ -61,6 +63,7 @@ files, IDE state, and build products are excluded by `.gitignore`.
 - AMD Vivado and Vitis 2025.2
 - ZedBoard board definition: `avnet.com:zedboard:part0:1.4`
 - Python 3, Matplotlib, and a C++17 compiler for the PC simulator
+  (`pip install -r requirements.txt`)
 - PySerial when using the plotter directly with FPGA UART output
 
 The reconstruction script normally finds the Windows board store through
@@ -158,7 +161,7 @@ From the repository root:
 python pc_sim\pc_sim_launcher.py
 ```
 
-The launcher builds `pc_sim/taylor_solver.cpp` with a C++17 compiler and starts
+The launcher builds `pc_sim/pc_solver.cpp` with a C++17 compiler and starts
 the real-time plotter. A failed build aborts the launch instead of falling back
 to a stale executable.
 
@@ -177,11 +180,10 @@ Custom factors use `min(0.0001 * factor, 0.002)` seconds per physics step.
 Each 100 ms output frame is capped at 100,000 substeps. The application targets
 10 Hz telemetry; CSV field 10 (zero-based index 9) reports measured achieved
 compression, so HLS or UART overruns are visible rather than silently reported
-as nominal speed.
-If a custom request
-exceeds that budget, CSV field 10 reports the achieved factor rather than the
-unattainable requested factor. PC pacing uses a steady-clock deadline and
-sleeps only for the part of the 100 ms frame left after computation.
+as nominal speed. If a custom request exceeds that budget, the same field
+reports the achieved factor rather than the unattainable requested factor. PC
+pacing uses a steady-clock deadline and sleeps only for the part of the 100 ms
+frame left after computation.
 
 Thermal power is `0.934 * neutron_power + decay_heat`. Three continuously
 evolved decay groups contribute 0.066 at unit-power equilibrium, making total
@@ -308,8 +310,13 @@ iodine-xenon solution.
 
 ## Native regression tests
 
-From the repository root, build with strict warnings and run the three native
-suites:
+From the repository root, run the native suites with:
+
+```powershell
+.\scripts\run_native_tests.ps1
+```
+
+Or build them individually with strict warnings:
 
 ```powershell
 g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unknown-pragmas hls\point_kinetics_hls\point_kinetics.cpp hls\point_kinetics_hls\tb_point_kinetics.cpp -o hls\point_kinetics_hls\tb_point_kinetics_test.exe
@@ -338,7 +345,7 @@ g++ -std=c++17 -O2 -DPOINT_KINETICS_LONG_TEST -Wall -Wextra -Wpedantic -Werror -
 Also compile the PC front end and Python scripts before release:
 
 ```powershell
-g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror pc_sim\taylor_solver.cpp -o tests\taylor_solver_build_test.exe
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror pc_sim\pc_solver.cpp -o tests\pc_solver_build_test.exe
 python -m py_compile pc_sim\plot_realtime.py pc_sim\pc_sim_launcher.py scripts\build_vitis.py
 ```
 
