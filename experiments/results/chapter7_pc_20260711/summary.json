@@ -1,0 +1,276 @@
+{
+  "steady_state": [
+    {
+      "file": "steady_power_0_10.csv",
+      "initial_power": 0.1000000015,
+      "max_power_drift_fraction": 5.960999911138885e-07,
+      "max_abs_rho": 9.313225746e-10,
+      "max_fuel_temperature_drift": 3.049999997983832e-05,
+      "max_coolant_temperature_drift": 3.049999997983832e-05,
+      "final_power": 0.09999994934,
+      "final_time_s": 300.0
+    },
+    {
+      "file": "steady_power_0_50.csv",
+      "initial_power": 0.5,
+      "max_power_drift_fraction": 0.0,
+      "max_abs_rho": 4.656612873e-10,
+      "max_fuel_temperature_drift": 0.0,
+      "max_coolant_temperature_drift": 0.0,
+      "final_power": 0.5,
+      "final_time_s": 300.0
+    },
+    {
+      "file": "steady_power_1_00.csv",
+      "initial_power": 1.0,
+      "max_power_drift_fraction": 0.0,
+      "max_abs_rho": 0.0,
+      "max_fuel_temperature_drift": 0.0,
+      "max_coolant_temperature_drift": 0.0,
+      "final_power": 1.0,
+      "final_time_s": 300.0
+    },
+    {
+      "file": "steady_power_1_50.csv",
+      "initial_power": 1.5,
+      "max_power_drift_fraction": 0.0,
+      "max_abs_rho": 6.98491931e-10,
+      "max_fuel_temperature_drift": 0.0,
+      "max_coolant_temperature_drift": 0.0,
+      "final_power": 1.5,
+      "final_time_s": 300.0
+    }
+  ],
+  "rod_transients": [
+    {
+      "file": "rod_withdrawal.csv",
+      "peak_power": 1.435726047,
+      "time_to_peak_s": 29.90000153,
+      "min_power": 0.864507854,
+      "max_fuel_temperature": 597.5249023,
+      "max_coolant_temperature": 298.4734497,
+      "final_power": 1.001561522,
+      "initial_power": 1.0
+    },
+    {
+      "file": "rod_insertion.csv",
+      "peak_power": 1.201619983,
+      "time_to_peak_s": 91.40000153,
+      "min_power": 0.7088071108,
+      "max_fuel_temperature": 545.3863525,
+      "max_coolant_temperature": 293.2269897,
+      "final_power": 0.9988888502,
+      "initial_power": 1.0
+    }
+  ],
+  "scram_long_table": [
+    {
+      "time_after_scram_s": 0.1,
+      "sim_time_s": 10.09999943,
+      "neutron_power": 0.06505672634,
+      "decay_heat": 0.06583776325,
+      "thermal_power": 0.1266007423,
+      "Tf": 542.1486206,
+      "Tc": 292.9983826
+    },
+    {
+      "time_after_scram_s": 1.0,
+      "sim_time_s": 11.0,
+      "neutron_power": 0.05081297085,
+      "decay_heat": 0.06437946856,
+      "thermal_power": 0.1118387878,
+      "Tf": 534.3823242,
+      "Tc": 292.8484192
+    },
+    {
+      "time_after_scram_s": 10.0,
+      "sim_time_s": 20.0,
+      "neutron_power": 0.01823722571,
+      "decay_heat": 0.05339895189,
+      "thermal_power": 0.0704325214,
+      "Tf": 466.8731689,
+      "Tc": 287.0750122
+    },
+    {
+      "time_after_scram_s": 60.0,
+      "sim_time_s": 70.0,
+      "neutron_power": 0.00390722556,
+      "decay_heat": 0.03879965469,
+      "thermal_power": 0.04244900495,
+      "Tf": 310.1142883,
+      "Tc": 269.8728333
+    },
+    {
+      "time_after_scram_s": 600.0,
+      "sim_time_s": 610.0,
+      "neutron_power": 1.517028977e-06,
+      "decay_heat": 0.02471639216,
+      "thermal_power": 0.02471780963,
+      "Tf": 271.9803162,
+      "Tc": 265.7040405
+    },
+    {
+      "time_after_scram_s": 3600.0,
+      "sim_time_s": 3610.000244,
+      "neutron_power": 4.691667877e-23,
+      "decay_heat": 0.01694077253,
+      "thermal_power": 0.01694077253,
+      "Tf": 269.7157593,
+      "Tc": 265.4750366
+    },
+    {
+      "time_after_scram_s": 7200.0,
+      "sim_time_s": 7210.000488,
+      "neutron_power": 7.258726045e-43,
+      "decay_heat": 0.0143401688,
+      "thermal_power": 0.0143401688,
+      "Tf": 268.9917603,
+      "Tc": 265.4020996
+    }
+  ],
+  "xenon": {
+    "file": "xenon_36h.csv",
+    "duration_after_scram_h": 36.00000216666667,
+    "iodine_max": 1.0,
+    "iodine_max_time_after_scram_s": 0.0,
+    "xenon_max": 1.503221393,
+    "xenon_max_time_after_scram_s": 26600.00195,
+    "most_negative_xenon_rho": -0.01006442774,
+    "most_negative_xenon_rho_time_after_scram_s": 26600.00195,
+    "xenon_return_within_1pct_time_after_scram_s": 74900.0,
+    "maximum_critical_rod_position": 0.8578808308,
+    "minimum_neutron_power": 0.0
+  },
+  "preset_comparison": [
+    {
+      "file": "preset_0.csv",
+      "peak_power": 1.143623352,
+      "time_to_peak_s": 29.70000076,
+      "min_power": 0.9424937367,
+      "max_fuel_temperature": 563.0895386,
+      "max_coolant_temperature": 295.0187073,
+      "final_power": 1.000529885,
+      "initial_power": 1.0
+    },
+    {
+      "file": "preset_1.csv",
+      "peak_power": 1.633655071,
+      "time_to_peak_s": 80.0,
+      "min_power": 1.0,
+      "max_fuel_temperature": 685.1364136,
+      "max_coolant_temperature": 322.7713623,
+      "final_power": 1.240664721,
+      "initial_power": 1.0
+    },
+    {
+      "file": "preset_2.csv",
+      "peak_power": 1.0,
+      "time_to_peak_s": 0.0,
+      "min_power": 0.2063160092,
+      "max_fuel_temperature": 561.7976685,
+      "max_coolant_temperature": 457.663208,
+      "final_power": 0.2319813371,
+      "initial_power": 1.0
+    }
+  ],
+  "rk4_convergence": [
+    {
+      "h_s": 9.99999974738e-05,
+      "n_rmse": 1.958420735990294e-05,
+      "n_max_abs": 0.000571032396396,
+      "n_max_relative": 0.0004673260564382969,
+      "n_final_error": 4.06342091774e-06,
+      "Tf_rmse": 0.0005108042766293709,
+      "Tf_max_abs": 0.000619591543114,
+      "Tf_max_relative": 1.1073471899414123e-06,
+      "Tf_final_error": -0.000390176389828,
+      "Tc_rmse": 4.589836197864454e-05,
+      "Tc_max_abs": 7.04871564494e-05,
+      "Tc_max_relative": 2.3917639193592306e-07,
+      "Tc_final_error": -4.33736086052e-05
+    },
+    {
+      "h_s": 0.000500000023749,
+      "n_rmse": 9.847252951291182e-05,
+      "n_max_abs": 0.0028606852208,
+      "n_max_relative": 0.0023411504345205087,
+      "n_final_error": 1.92030006907e-05,
+      "Tf_rmse": 0.002623281340598957,
+      "Tf_max_abs": 0.00305844491231,
+      "Tf_max_relative": 5.472125478403e-06,
+      "Tf_final_error": -0.00216019592108,
+      "Tc_rmse": 0.00023031763776888527,
+      "Tc_max_abs": 0.000301408726102,
+      "Tc_max_relative": 1.0234982150169544e-06,
+      "Tc_final_error": -0.00025699665548
+    },
+    {
+      "h_s": 0.0010000000475,
+      "n_rmse": 0.00019725963608454677,
+      "n_max_abs": 0.00571789347275,
+      "n_max_relative": 0.004679455359484493,
+      "n_final_error": 3.81572777293e-05,
+      "Tf_rmse": 0.005262909903586977,
+      "Tf_max_abs": 0.00610351925161,
+      "Tf_max_relative": 1.0924054130837339e-05,
+      "Tf_final_error": -0.00429642638983,
+      "Tc_rmse": 0.00046241651477617817,
+      "Tc_max_abs": 0.000590427229895,
+      "Tc_max_relative": 2.004384067074153e-06,
+      "Tc_final_error": -0.000531654858605
+    },
+    {
+      "h_s": 0.00200000009499,
+      "n_rmse": 0.00039333623953314147,
+      "n_max_abs": 0.0113432606374,
+      "n_max_relative": 0.009283188299445907,
+      "n_final_error": 7.60658318064e-05,
+      "Tf_rmse": 0.010545977232801282,
+      "Tf_max_abs": 0.012195819413,
+      "Tf_max_relative": 2.182327054008202e-05,
+      "Tf_final_error": -0.00869095763983,
+      "Tc_rmse": 0.0009252357930512352,
+      "Tc_max_abs": 0.00116750257047,
+      "Tc_max_relative": 3.963313030411457e-06,
+      "Tc_final_error": -0.00105045368673
+    }
+  ],
+  "performance": [
+    {
+      "mode": "REALTIME",
+      "frames": 1000,
+      "mean_frame_time_s": 1.3379e-05,
+      "median_frame_time_s": 1.32e-05,
+      "std_frame_time_s": 1.3556979445720631e-06,
+      "p95_frame_time_s": 1.35e-05,
+      "max_frame_time_s": 4.71e-05,
+      "mean_achieved_factor": 7504.41763766245,
+      "min_achieved_factor": 2123.1421969,
+      "missed_100ms_deadlines": 0
+    },
+    {
+      "mode": "TRAINING",
+      "frames": 1000,
+      "mean_frame_time_s": 1.33567e-05,
+      "median_frame_time_s": 1.32e-05,
+      "std_frame_time_s": 1.454995574605683e-06,
+      "p95_frame_time_s": 1.33e-05,
+      "max_frame_time_s": 4.68e-05,
+      "mean_achieved_factor": 75166.86561452401,
+      "min_achieved_factor": 21367.5223824,
+      "missed_100ms_deadlines": 0
+    },
+    {
+      "mode": "XENON",
+      "frames": 1000,
+      "mean_frame_time_s": 0.0006679089,
+      "median_frame_time_s": 0.0006596,
+      "std_frame_time_s": 4.467491509593308e-05,
+      "p95_frame_time_s": 0.0006999,
+      "max_frame_time_s": 0.0015223,
+      "mean_achieved_factor": 150100.6145006602,
+      "min_achieved_factor": 65690.0773499,
+      "missed_100ms_deadlines": 0
+    }
+  ]
+}

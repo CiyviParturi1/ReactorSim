@@ -1,0 +1,46 @@
+﻿{
+    "generated_utc":  "2026-07-11T14:46:39.1993066Z",
+    "source_commit":  "7fea66590ae2d016ea7da48eff30b9d7d4a8e33c",
+    "source_branch":  "main",
+    "source_tree_dirty":  true,
+    "source_tree_status":  " M tests/pc_hls_parity.cpp\n?? experiments/",
+    "working_directory":  "C:\\fpga_projects\\pk",
+    "host":  {
+                 "computer_name":  "PARTURI",
+                 "operating_system":  "Microsoft Windows NT 10.0.26200.0",
+                 "operating_system_version":  "10.0.26200.0",
+                 "cpu":  "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+                 "logical_processors":  "20",
+                 "physical_memory_gb":  null
+             },
+    "compiler":  {
+                     "executable":  "g++",
+                     "version":  "g++.exe (x86_64-posix-seh-rev0, Built by MinGW-Builds project) 13.2.0",
+                     "flags":  "-std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -Wno-unknown-pragmas"
+                 },
+    "campaign":  {
+                     "arithmetic":  "IEEE-754 single-precision float for the PC core",
+                     "output_frame_s":  0.1,
+                     "timesteps_s":  [
+                                         0.0001,
+                                         0.0005,
+                                         0.001,
+                                         0.002
+                                     ],
+                     "steady_duration_s":  300,
+                     "scram_fast_duration_s":  70,
+                     "scram_long_duration_s":  7210,
+                     "xenon_duration_h_after_scram":  36,
+                     "performance_frames_per_mode":  1000,
+                     "project_defined_steady_power_drift_tolerance":  0.001,
+                     "project_defined_steady_reactivity_tolerance":  1E-05
+                 },
+    "hardware":  {
+                     "board":  "ZedBoard XC7Z020-1",
+                     "target_clock_ns":  10,
+                     "uart":  "pending hardware measurement",
+                     "vivado_available_on_path":  false,
+                     "vitis_available_on_path":  false,
+                     "hardware_execution":  "pending hardware testing"
+                 }
+}

@@ -1,10 +1,22 @@
 #include "../hls/point_kinetics_hls/point_kinetics.h"
 
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <limits>
+#include <array>
 
 namespace {
+
+const char* const MAX_DIFF_LABELS[] = {
+    "N", "C1", "C2", "C3", "C4", "C5", "C6", "Tf", "Tc", "I", "Xe", "rho", "P_decay"
+};
+std::array<float, 13> max_abs_diff = {};
+
+void record_difference(int index, float top, float core) {
+    max_abs_diff[static_cast<std::size_t>(index)] = std::max(
+        max_abs_diff[static_cast<std::size_t>(index)], std::fabs(top - core));
+}
 
 struct Outputs {
     float t, n, tf, tc, iodine, xenon, rho, dollars, rho_xe;
@@ -29,6 +41,18 @@ bool near(float a, float b, float tolerance = 2.0e-5f) {
 int compare(const pk::ReactorState& state, const Outputs& out, const char* scenario) {
     const PlantConfig cfg = pk::plant_config(state.plant_mode);
     int failures = 0;
+#define RECORD(index, actual, expected) record_difference(index, (actual), (expected))
+    RECORD(0, out.n, state.n);
+    RECORD(7, out.tf, state.Tf);
+    RECORD(8, out.tc, state.Tc);
+    RECORD(9, out.iodine, state.I_Xe);
+    RECORD(10, out.xenon, state.Xe);
+    RECORD(11, out.rho, pk::total_rho(state, cfg));
+    RECORD(12, out.decay, state.decay_heat);
+    for (int i = 0; i < 6; ++i) {
+        RECORD(1 + i, out.precursors[i], state.C[i]);
+    }
+#undef RECORD
 #define CHECK(field, expected) \
     do { \
         if (!near(out.field, (expected))) { \
@@ -167,6 +191,11 @@ int main() {
         std::cerr << "FAILED: " << failures << " parity checks\n";
         return 1;
     }
+    std::cout << std::scientific << std::setprecision(9) << "MAX_ABS_DIFF";
+    for (std::size_t i = 0; i < max_abs_diff.size(); ++i) {
+        std::cout << ' ' << MAX_DIFF_LABELS[i] << '=' << max_abs_diff[i];
+    }
+    std::cout << '\n';
     std::cout << "PASS: PC/core and HLS top parity scenarios\n";
     return 0;
 }
