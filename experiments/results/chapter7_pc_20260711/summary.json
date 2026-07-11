@@ -44,23 +44,23 @@
   "rod_transients": [
     {
       "file": "rod_withdrawal.csv",
-      "peak_power": 1.435726047,
-      "time_to_peak_s": 29.90000153,
-      "min_power": 0.864507854,
-      "max_fuel_temperature": 597.5249023,
-      "max_coolant_temperature": 298.4734497,
-      "final_power": 1.001561522,
-      "initial_power": 1.0
+      "disturbance_extremum": "maximum",
+      "disturbance_power": 1.435726047,
+      "disturbance_time_s": 29.90000153,
+      "recovery_extremum": "minimum",
+      "recovery_power": 0.864507854,
+      "recovery_time_s": 93.1000061,
+      "final_power": 1.001561522
     },
     {
       "file": "rod_insertion.csv",
-      "peak_power": 1.201619983,
-      "time_to_peak_s": 91.40000153,
-      "min_power": 0.7088071108,
-      "max_fuel_temperature": 545.3863525,
-      "max_coolant_temperature": 293.2269897,
-      "final_power": 0.9988888502,
-      "initial_power": 1.0
+      "disturbance_extremum": "minimum",
+      "disturbance_power": 0.7088071108,
+      "disturbance_time_s": 35.5,
+      "recovery_extremum": "maximum",
+      "recovery_power": 1.201619983,
+      "recovery_time_s": 91.40000153,
+      "final_power": 0.9988888502
     }
   ],
   "scram_long_table": [
@@ -131,13 +131,12 @@
   "xenon": {
     "file": "xenon_36h.csv",
     "duration_after_scram_h": 36.00000216666667,
-    "iodine_max": 1.0,
-    "iodine_max_time_after_scram_s": 0.0,
+    "iodine_at_xenon_peak": 0.4660790563,
     "xenon_max": 1.503221393,
-    "xenon_max_time_after_scram_s": 26600.00195,
-    "most_negative_xenon_rho": -0.01006442774,
-    "most_negative_xenon_rho_time_after_scram_s": 26600.00195,
-    "xenon_return_within_1pct_time_after_scram_s": 74900.0,
+    "xenon_peak_time_h": 7.388889430555556,
+    "maximum_xenon_worth_dollars": -1.4377753914285714,
+    "xenon_worth_time_h": 7.388889430555556,
+    "xenon_return_within_1pct_time_h": 20.805555555555557,
     "maximum_critical_rod_position": 0.8578808308,
     "minimum_neutron_power": 0.0
   },
@@ -239,37 +238,37 @@
     {
       "mode": "REALTIME",
       "frames": 1000,
-      "mean_frame_time_s": 1.3379e-05,
+      "mean_frame_time_s": 1.3256600000000001e-05,
       "median_frame_time_s": 1.32e-05,
-      "std_frame_time_s": 1.3556979445720631e-06,
-      "p95_frame_time_s": 1.35e-05,
-      "max_frame_time_s": 4.71e-05,
-      "mean_achieved_factor": 7504.41763766245,
-      "min_achieved_factor": 2123.1421969,
+      "std_frame_time_s": 4.166653933914478e-07,
+      "p95_frame_time_s": 1.33e-05,
+      "max_frame_time_s": 2.02e-05,
+      "mean_kernel_throughput_factor": 7549.13088871419,
+      "min_kernel_throughput_factor": 4950.49492444,
       "missed_100ms_deadlines": 0
     },
     {
       "mode": "TRAINING",
       "frames": 1000,
-      "mean_frame_time_s": 1.33567e-05,
+      "mean_frame_time_s": 1.33659e-05,
       "median_frame_time_s": 1.32e-05,
-      "std_frame_time_s": 1.454995574605683e-06,
-      "p95_frame_time_s": 1.33e-05,
-      "max_frame_time_s": 4.68e-05,
-      "mean_achieved_factor": 75166.86561452401,
-      "min_achieved_factor": 21367.5223824,
+      "std_frame_time_s": 9.756634199912943e-07,
+      "p95_frame_time_s": 1.35e-05,
+      "max_frame_time_s": 3.24e-05,
+      "mean_kernel_throughput_factor": 75037.7982408229,
+      "min_kernel_throughput_factor": 30864.1989968,
       "missed_100ms_deadlines": 0
     },
     {
       "mode": "XENON",
       "frames": 1000,
-      "mean_frame_time_s": 0.0006679089,
-      "median_frame_time_s": 0.0006596,
-      "std_frame_time_s": 4.467491509593308e-05,
-      "p95_frame_time_s": 0.0006999,
-      "max_frame_time_s": 0.0015223,
-      "mean_achieved_factor": 150100.6145006602,
-      "min_achieved_factor": 65690.0773499,
+      "mean_frame_time_s": 0.000678898,
+      "median_frame_time_s": 0.00065945,
+      "std_frame_time_s": 5.518695331159183e-05,
+      "p95_frame_time_s": 0.0007567,
+      "max_frame_time_s": 0.0014958,
+      "mean_kernel_throughput_factor": 147983.3111878954,
+      "min_kernel_throughput_factor": 66853.860643,
       "missed_100ms_deadlines": 0
     }
   ]

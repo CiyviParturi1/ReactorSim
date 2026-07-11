@@ -12,12 +12,14 @@ All values below were computed from the raw CSV files in this directory. The PC 
 | steady_power_1_50.csv | 1.5 | 0.0 | 6.98491931e-10 | 0.0 | 0.0 |
 
 
-## Rod transients
+## Rod-transient phase summary
 
-| file | peak_power | time_to_peak_s | min_power | max_fuel_temperature | max_coolant_temperature | final_power |
-|---|---|---|---|---|---|---|
-| rod_withdrawal.csv | 1.435726047 | 29.90000153 | 0.864507854 | 597.5249023 | 298.4734497 | 1.001561522 |
-| rod_insertion.csv | 1.201619983 | 91.40000153 | 0.7088071108 | 545.3863525 | 293.2269897 | 0.9988888502 |
+The disturbance extremum is measured during 20–80 s. The recovery extremum is measured after the rod target is restored at 80 s.
+
+| file | disturbance_extremum | disturbance_power | disturbance_time_s | recovery_extremum | recovery_power | recovery_time_s | final_power |
+|---|---|---|---|---|---|---|---|
+| rod_withdrawal.csv | maximum | 1.435726047 | 29.90000153 | minimum | 0.864507854 | 93.1000061 | 1.001561522 |
+| rod_insertion.csv | minimum | 0.7088071108 | 35.5 | maximum | 1.201619983 | 91.40000153 | 0.9988888502 |
 
 
 ## SCRAM and decay heat
@@ -35,12 +37,14 @@ All values below were computed from the raw CSV files in this directory. The PC 
 
 ## Iodine-xenon transient
 
-| duration_after_scram_h | iodine_max | iodine_max_time_after_scram_s | xenon_max | xenon_max_time_after_scram_s | most_negative_xenon_rho | xenon_return_within_1pct_time_after_scram_s | maximum_critical_rod_position |
+| duration_after_scram_h | iodine_at_xenon_peak | xenon_max | xenon_peak_time_h | maximum_xenon_worth_dollars | xenon_worth_time_h | xenon_return_within_1pct_time_h | maximum_critical_rod_position |
 |---|---|---|---|---|---|---|---|
-| 36.00000216666667 | 1.0 | 0.0 | 1.503221393 | 26600.00195 | -0.01006442774 | 74900.0 | 0.8578808308 |
+| 36.00000216666667 | 0.4660790563 | 1.503221393 | 7.388889430555556 | -1.4377753914285714 | 7.388889430555556 | 20.805555555555557 | 0.8578808308 |
 
 
-## Three-preset comparison
+## სამი რეაქტორული წინასწარი კონფიგურაციის პასუხი ერთნაირ რეაქტიულობის ზემოქმედებაზე
+
+This is a complete preset-behaviour comparison. It includes both the presets’ feedback coefficients and their different active cooling-removal conditions; it is not an isolation of temperature-feedback coefficients.
 
 | file | peak_power | time_to_peak_s | max_fuel_temperature | max_coolant_temperature | final_power |
 |---|---|---|---|---|---|
@@ -61,11 +65,13 @@ All values below were computed from the raw CSV files in this directory. The PC 
 
 ## PC physics-kernel performance
 
-| mode | frames | mean_frame_time_s | median_frame_time_s | std_frame_time_s | p95_frame_time_s | max_frame_time_s | mean_achieved_factor | missed_100ms_deadlines |
+The reported factor is kernel throughput factor: raw physics-kernel work divided by measured kernel wall time. It excludes pacing, GUI rendering, communication, and deliberate waiting. No 100 ms deadlines were missed in 1000 frames per mode, so the PC kernel can sustain the requested 1×, 10×, and 1000× operating modes.
+
+| mode | frames | mean_frame_time_s | median_frame_time_s | std_frame_time_s | p95_frame_time_s | max_frame_time_s | mean_kernel_throughput_factor | missed_100ms_deadlines |
 |---|---|---|---|---|---|---|---|---|
-| REALTIME | 1000 | 1.3379e-05 | 1.32e-05 | 1.3556979445720631e-06 | 1.35e-05 | 4.71e-05 | 7504.41763766245 | 0 |
-| TRAINING | 1000 | 1.33567e-05 | 1.32e-05 | 1.454995574605683e-06 | 1.33e-05 | 4.68e-05 | 75166.86561452401 | 0 |
-| XENON | 1000 | 0.0006679089 | 0.0006596 | 4.467491509593308e-05 | 0.0006999 | 0.0015223 | 150100.6145006602 | 0 |
+| REALTIME | 1000 | 1.3256600000000001e-05 | 1.32e-05 | 4.166653933914478e-07 | 1.33e-05 | 2.02e-05 | 7549.13088871419 | 0 |
+| TRAINING | 1000 | 1.33659e-05 | 1.32e-05 | 9.756634199912943e-07 | 1.35e-05 | 3.24e-05 | 75037.7982408229 | 0 |
+| XENON | 1000 | 0.000678898 | 0.00065945 | 5.518695331159183e-05 | 0.0007567 | 0.0014958 | 147983.3111878954 | 0 |
 
 
 ## Hardware/HLS work still pending
