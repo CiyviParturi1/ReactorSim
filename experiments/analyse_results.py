@@ -65,6 +65,33 @@ def transient_summary(path: Path) -> dict[str, float | str]:
     }
 
 
+def rod_phase_summary(path: Path) -> dict[str, float | str]:
+    rows = read_csv(path)
+    disturbance = [row for row in rows if 20.0 <= number(row, "sim_time_s") <= 80.0]
+    recovery = [row for row in rows if number(row, "sim_time_s") >= 80.0]
+    withdrawal = path.stem.endswith("withdrawal")
+    if withdrawal:
+        disturbance_row = max(disturbance, key=lambda row: number(row, "n"))
+        recovery_row = min(recovery, key=lambda row: number(row, "n"))
+        disturbance_label = "maximum"
+        recovery_label = "minimum"
+    else:
+        disturbance_row = min(disturbance, key=lambda row: number(row, "n"))
+        recovery_row = max(recovery, key=lambda row: number(row, "n"))
+        disturbance_label = "minimum"
+        recovery_label = "maximum"
+    return {
+        "file": path.name,
+        "disturbance_extremum": disturbance_label,
+        "disturbance_power": number(disturbance_row, "n"),
+        "disturbance_time_s": number(disturbance_row, "sim_time_s"),
+        "recovery_extremum": recovery_label,
+        "recovery_power": number(recovery_row, "n"),
+        "recovery_time_s": number(recovery_row, "sim_time_s"),
+        "final_power": number(rows[-1], "n"),
+    }
+
+
 def scram_table(path: Path, event_time_s: float = 10.0) -> list[dict[str, float | str]]:
     rows = read_csv(path)
     result = []
@@ -85,7 +112,6 @@ def scram_table(path: Path, event_time_s: float = 10.0) -> list[dict[str, float 
 def xenon_summary(path: Path) -> dict[str, float | str]:
     rows = read_csv(path)
     post_scram = [row for row in rows if number(row, "sim_time_s") >= 10.0]
-    max_iodine = max(post_scram, key=lambda row: number(row, "I_norm"))
     max_xenon = max(post_scram, key=lambda row: number(row, "Xe_norm"))
     min_rho_xe = min(post_scram, key=lambda row: number(row, "rho_xe"))
     after_peak = [row for row in post_scram if number(row, "sim_time_s") >= number(max_xenon, "sim_time_s")]
@@ -93,13 +119,12 @@ def xenon_summary(path: Path) -> dict[str, float | str]:
     return {
         "file": path.name,
         "duration_after_scram_h": (number(rows[-1], "sim_time_s") - 10.0) / 3600.0,
-        "iodine_max": number(max_iodine, "I_norm"),
-        "iodine_max_time_after_scram_s": number(max_iodine, "sim_time_s") - 10.0,
+        "iodine_at_xenon_peak": number(max_xenon, "I_norm"),
         "xenon_max": number(max_xenon, "Xe_norm"),
-        "xenon_max_time_after_scram_s": number(max_xenon, "sim_time_s") - 10.0,
-        "most_negative_xenon_rho": number(min_rho_xe, "rho_xe"),
-        "most_negative_xenon_rho_time_after_scram_s": number(min_rho_xe, "sim_time_s") - 10.0,
-        "xenon_return_within_1pct_time_after_scram_s": (number(close_rows[0], "sim_time_s") - 10.0) if close_rows else None,
+        "xenon_peak_time_h": (number(max_xenon, "sim_time_s") - 10.0) / 3600.0,
+        "maximum_xenon_worth_dollars": number(min_rho_xe, "rho_xe") / 0.007,
+        "xenon_worth_time_h": (number(min_rho_xe, "sim_time_s") - 10.0) / 3600.0,
+        "xenon_return_within_1pct_time_h": ((number(close_rows[0], "sim_time_s") - 10.0) / 3600.0) if close_rows else None,
         "maximum_critical_rod_position": max(number(row, "critical_rod_position") for row in post_scram),
         "minimum_neutron_power": min(number(row, "n") for row in post_scram),
     }
@@ -132,7 +157,8 @@ def performance_summary(path: Path) -> list[dict[str, float | str]]:
     for mode in ("REALTIME", "TRAINING", "XENON"):
         subset = [row for row in rows if row.get("mode") == mode]
         times = [number(row, "wall_compute_s") for row in subset]
-        factors = [number(row, "achieved_factor") for row in subset]
+        factor_key = "kernel_throughput_factor" if "kernel_throughput_factor" in subset[0] else "achieved_factor"
+        factors = [number(row, factor_key) for row in subset]
         sorted_times = sorted(times)
         p95 = sorted_times[min(len(sorted_times) - 1, math.ceil(0.95 * len(sorted_times)) - 1)]
         result.append({
@@ -143,8 +169,8 @@ def performance_summary(path: Path) -> list[dict[str, float | str]]:
             "std_frame_time_s": statistics.stdev(times) if len(times) > 1 else 0.0,
             "p95_frame_time_s": p95,
             "max_frame_time_s": max(times),
-            "mean_achieved_factor": statistics.mean(factors),
-            "min_achieved_factor": min(factors),
+            "mean_kernel_throughput_factor": statistics.mean(factors),
+            "min_kernel_throughput_factor": min(factors),
             "missed_100ms_deadlines": sum(int(number(row, "missed_100ms_deadline")) for row in subset),
         })
     return result
@@ -177,7 +203,18 @@ def make_plots(input_dir: Path, figures_dir: Path) -> None:
     plot_file("rod_withdrawal.csv", "sim_time_s", [("N", "n"), ("rod position", "rod_position"), ("rho ($)", "rho_dollars")], "Control-rod withdrawal", "rod_withdrawal.png")
     plot_file("rod_insertion.csv", "sim_time_s", [("N", "n"), ("rod position", "rod_position"), ("rho ($)", "rho_dollars")], "Control-rod insertion", "rod_insertion.png")
     plot_file("scram_fast.csv", "sim_time_s", [("N", "n"), ("thermal power", "thermal_power"), ("decay heat", "decay_heat")], "Fast SCRAM response", "scram_fast.png", log_y=True)
-    plot_file("xenon_36h.csv", "sim_time_s", [("I norm", "I_norm"), ("Xe norm", "Xe_norm")], "36-hour iodine-xenon transient", "xenon_36h.png")
+    xenon_rows = read_csv(input_dir / "xenon_36h.csv")
+    figure, axis = plt.subplots(figsize=(10, 5.5))
+    time_h = [(number(row, "sim_time_s") - 10.0) / 3600.0 for row in xenon_rows]
+    axis.plot(time_h, [number(row, "I_norm") for row in xenon_rows], label="I norm")
+    axis.plot(time_h, [number(row, "Xe_norm") for row in xenon_rows], label="Xe norm")
+    axis.set_title("36-hour iodine-xenon transient after SCRAM")
+    axis.set_xlabel("time after SCRAM (h)")
+    axis.grid(True, alpha=0.3)
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(figures_dir / "xenon_36h.png", dpi=160)
+    plt.close(figure)
 
     figure, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
     for mode in range(3):
@@ -231,7 +268,7 @@ def main() -> int:
 
     summary: dict[str, object] = {
         "steady_state": [physical_summary(path) for path in sorted(input_dir.glob("steady_power_*.csv"))],
-        "rod_transients": [transient_summary(input_dir / name) for name in ("rod_withdrawal.csv", "rod_insertion.csv")],
+        "rod_transients": [rod_phase_summary(input_dir / name) for name in ("rod_withdrawal.csv", "rod_insertion.csv")],
         "scram_long_table": scram_table(input_dir / "scram_long.csv"),
         "xenon": xenon_summary(input_dir / "xenon_36h.csv"),
         "preset_comparison": [transient_summary(input_dir / f"preset_{mode}.csv") for mode in range(3)],
@@ -249,9 +286,11 @@ def main() -> int:
         "",
         markdown_table(summary["steady_state"], ["file", "initial_power", "max_power_drift_fraction", "max_abs_rho", "max_fuel_temperature_drift", "max_coolant_temperature_drift"]),
         "",
-        "## Rod transients",
+        "## Rod-transient phase summary",
         "",
-        markdown_table(summary["rod_transients"], ["file", "peak_power", "time_to_peak_s", "min_power", "max_fuel_temperature", "max_coolant_temperature", "final_power"]),
+        "The disturbance extremum is measured during 20–80 s. The recovery extremum is measured after the rod target is restored at 80 s.",
+        "",
+        markdown_table(summary["rod_transients"], ["file", "disturbance_extremum", "disturbance_power", "disturbance_time_s", "recovery_extremum", "recovery_power", "recovery_time_s", "final_power"]),
         "",
         "## SCRAM and decay heat",
         "",
@@ -259,9 +298,11 @@ def main() -> int:
         "",
         "## Iodine-xenon transient",
         "",
-        markdown_table([summary["xenon"]], ["duration_after_scram_h", "iodine_max", "iodine_max_time_after_scram_s", "xenon_max", "xenon_max_time_after_scram_s", "most_negative_xenon_rho", "xenon_return_within_1pct_time_after_scram_s", "maximum_critical_rod_position"]),
+        markdown_table([summary["xenon"]], ["duration_after_scram_h", "iodine_at_xenon_peak", "xenon_max", "xenon_peak_time_h", "maximum_xenon_worth_dollars", "xenon_worth_time_h", "xenon_return_within_1pct_time_h", "maximum_critical_rod_position"]),
         "",
-        "## Three-preset comparison",
+        "## სამი რეაქტორული წინასწარი კონფიგურაციის პასუხი ერთნაირ რეაქტიულობის ზემოქმედებაზე",
+        "",
+        "This is a complete preset-behaviour comparison. It includes both the presets’ feedback coefficients and their different active cooling-removal conditions; it is not an isolation of temperature-feedback coefficients.",
         "",
         markdown_table(summary["preset_comparison"], ["file", "peak_power", "time_to_peak_s", "max_fuel_temperature", "max_coolant_temperature", "final_power"]),
         "",
@@ -271,7 +312,9 @@ def main() -> int:
         "",
         "## PC physics-kernel performance",
         "",
-        markdown_table(summary["performance"], ["mode", "frames", "mean_frame_time_s", "median_frame_time_s", "std_frame_time_s", "p95_frame_time_s", "max_frame_time_s", "mean_achieved_factor", "missed_100ms_deadlines"]),
+        "The reported factor is kernel throughput factor: raw physics-kernel work divided by measured kernel wall time. It excludes pacing, GUI rendering, communication, and deliberate waiting. No 100 ms deadlines were missed in 1000 frames per mode, so the PC kernel can sustain the requested 1×, 10×, and 1000× operating modes.",
+        "",
+        markdown_table(summary["performance"], ["mode", "frames", "mean_frame_time_s", "median_frame_time_s", "std_frame_time_s", "p95_frame_time_s", "max_frame_time_s", "mean_kernel_throughput_factor", "missed_100ms_deadlines"]),
         "",
         "## Hardware/HLS work still pending",
         "",

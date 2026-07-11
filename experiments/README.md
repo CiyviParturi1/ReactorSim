@@ -29,6 +29,12 @@ The campaign currently executes:
 * double-precision RK4 comparison and timestep convergence at the requested steps;
 * 1000 raw physics-kernel timing frames for REALTIME, TRAINING, and XENON modes.
 
+The performance factor is labelled **kernel throughput factor**. It measures
+raw physics-kernel work divided by kernel wall time; it is not the complete
+simulator compression factor. The interpretation is that the PC kernel can
+sustain the requested 1x, 10x, and 1000x modes when the 100 ms deadline is not
+missed.
+
 The driver also captures the existing native HLS smoke, PC/core-HLS parity, and
 independent physics regression output in `native_tests.txt`. The parity suite
 prints maximum absolute differences for `N`, all six precursor groups, `Tf`,
@@ -44,3 +50,8 @@ tools are available: measured FPGA execution time, achieved FPGA compression,
 UART reliability, GUI hardware operation, RTL co-simulation, and PC-FPGA parity.
 PC/core-HLS parity is still covered by the existing native test, but it is
 implementation consistency rather than independent physical validation.
+
+The three-preset section is titled `სამი რეაქტორული წინასწარი კონფიგურაციის
+პასუხი ერთნაირ რეაქტიულობის ზემოქმედებაზე`. Its comparison includes both the
+feedback-coefficient differences and the different active cooling-removal
+conditions of the presets.

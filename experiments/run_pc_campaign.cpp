@@ -350,7 +350,7 @@ void run_performance(const fs::path& root) {
     if (!out) {
         throw std::runtime_error("cannot open performance_frames.csv");
     }
-    out << "mode,frame,simulated_frame_s,wall_compute_s,achieved_factor,missed_100ms_deadline,n\n";
+    out << "mode,frame,simulated_frame_s,wall_compute_s,kernel_throughput_factor,missed_100ms_deadline,n\n";
     out << std::setprecision(12);
 
     const PerformanceMode modes[] = {
