@@ -161,6 +161,37 @@ void test_positive_reactivity_guard() {
     expect( std::isfinite(state.n) && state.n >= 0.0f, "positive-reactivity guard must keep power finite");
 }
 
+void test_all_numerical_faults_latch_scram() {
+    pk::ReactorParams params;
+    pk::ReactorState state;
+
+    pk::reset(state, params, 1.0f, 0);
+    state.n = 2.0e12f;
+    pk::step(state, params, PK_BASE_H);
+    expect(state.numerical_fault && state.scram_active && state.rod_position == 0.0f,
+           "oversized neutron power must latch SCRAM");
+    expect(std::isfinite(state.n) && state.n == 0.0f,
+           "oversized neutron power must be sanitized");
+    pk::reset_scram_trip(state);
+    expect(state.scram_active, "numerical SCRAM must not be clearable by trip reset");
+
+    pk::reset(state, params, 1.0f, 0);
+    state.Tf = std::numeric_limits<float>::quiet_NaN();
+    pk::step(state, params, PK_BASE_H);
+    expect(state.numerical_fault && state.scram_active && state.rod_position == 0.0f,
+           "non-finite fuel temperature must latch SCRAM");
+    expect(std::isfinite(state.Tf) && std::isfinite(state.Tc),
+           "non-finite temperatures must be sanitized");
+
+    pk::reset(state, params, 1.0f, 0);
+    state.C[0] = std::numeric_limits<float>::quiet_NaN();
+    pk::step(state, params, PK_BASE_H);
+    expect(state.numerical_fault && state.scram_active && state.rod_position == 0.0f,
+           "non-finite precursor state must latch SCRAM");
+    expect(std::isfinite(state.C[0]) && state.C[0] == 0.0f,
+           "non-finite precursor state must be sanitized");
+}
+
 void test_against_double_rk4() {
     pk::ReactorParams params;
     const pk::PlantConfig cfg = pk::plant_config(0);
@@ -196,6 +227,7 @@ int main() {
     test_poison_precision();
     test_decay_heat_curve();
     test_positive_reactivity_guard();
+    test_all_numerical_faults_latch_scram();
     test_against_double_rk4();
 
     if (failures != 0) {

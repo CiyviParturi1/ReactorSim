@@ -10,6 +10,8 @@
 
 #include "../../../common/point_kinetics_config.h"
 #include "../../../common/point_kinetics_c.h"
+#define PK_CSV_PRINTF xil_printf
+#include "../../../common/point_kinetics_csv.h"
 
 #define GPIO_BASEADDR   XPAR_AXI_GPIO_0_BASEADDR
 #define GPIO_CHANNEL    1
@@ -196,48 +198,14 @@ static int parse_float_arg(const char *text, float *out)
     return 1;
 }
 
-static void print_fixed(float value, int digits)
-{
-    int i;
-    int scale = 1;
-
-    if (value < 0.0f) {
-        xil_printf("-");
-        value = -value;
-    }
-
-    for (i = 0; i < digits; i++) {
-        scale *= 10;
-    }
-
-    int whole = (int)value;
-    int frac = (int)((value - (float)whole) * (float)scale + 0.5f);
-
-    if (frac >= scale) {
-        whole++;
-        frac -= scale;
-    }
-
-    xil_printf("%d", whole);
-    if (digits > 0) {
-        xil_printf(".");
-        for (i = scale / 10; i > 1; i /= 10) {
-            if (frac < i) {
-                xil_printf("0");
-            }
-        }
-        xil_printf("%d", frac);
-    }
-}
-
 static void print_csv_value(float value)
 {
-    print_fixed(value, 6);
+    pk_c_csv_print_fixed(value, 6);
 }
 
 static void print_precise_csv_value(float value)
 {
-    print_fixed(value, 9);
+    pk_c_csv_print_fixed(value, 9);
 }
 
 static void print_data_row(float t, float n, float Tf,

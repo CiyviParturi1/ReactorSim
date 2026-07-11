@@ -32,6 +32,10 @@ Invoke-Suite -Name "Physics regression" `
     -Compile "g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror tests\physics_regression.cpp -o tests\physics_regression.exe" `
     -Exe ".\tests\physics_regression.exe"
 
+Invoke-Suite -Name "ARM CSV formatting regression" `
+    -Compile "g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror tests\arm_csv_format_regression.cpp -o tests\arm_csv_format_regression.exe" `
+    -Exe ".\tests\arm_csv_format_regression.exe"
+
 Write-Host "==> PC solver build"
 g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror pc_sim\pc_solver.cpp -o tests\pc_solver_build_test.exe
 if ($LASTEXITCODE -ne 0) {

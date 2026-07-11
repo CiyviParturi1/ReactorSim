@@ -270,7 +270,8 @@ inline float xenon_ref(const ReactorParams& params, float I_ref) {
 // Iodine / xenon: one update per output frame (uses average power)
 // ---------------------------------------------------------------------------
 
-inline void update_poison_batched(float N_avg, float poison_dt, const ReactorParams& params, float& I_norm, float& Xe_norm, float& I_compensation, float& Xe_compensation) {
+inline bool update_poison_batched(float N_avg, float poison_dt, const ReactorParams& params, float& I_norm, float& Xe_norm, float& I_compensation, float& Xe_compensation) {
+    bool fault = !finite(N_avg) || !finite(poison_dt) || poison_dt < 0.0f;
     const float I_ref = iodine_ref(params);
     const float Xe_ref = xenon_ref(params, I_ref);
 
@@ -286,13 +287,16 @@ inline void update_poison_batched(float N_avg, float poison_dt, const ReactorPar
     compensated_add((Xe_eq_norm - Xe_norm) * Xe_factor, Xe_norm, Xe_compensation);
 
     if (!finite(I_norm) || I_norm < 0.0f) {
+        fault = true;
         I_norm = 0.0f;
         I_compensation = 0.0f;
     }
     if (!finite(Xe_norm) || Xe_norm < 0.0f) {
+        fault = true;
         Xe_norm = 0.0f;
         Xe_compensation = 0.0f;
     }
+    return fault;
 }
 
 // ---------------------------------------------------------------------------
@@ -359,6 +363,11 @@ inline void scram(ReactorState& state) {
     state.scram_active = true;
 }
 
+inline void latch_numerical_fault(ReactorState& state) {
+    state.numerical_fault = true;
+    scram(state);
+}
+
 inline void reset_scram_trip(ReactorState& state) {
     // Numerical trips stay latched until a full reset.
     if (state.numerical_fault) {
@@ -423,8 +432,7 @@ inline void step(ReactorState& state, const ReactorParams& params, float h) {
     const float n_old = state.n;
     float n_denom = 1.0f - h * (rho - params.beta_total) / params.Lambda;
     if (!finite(n_denom) || n_denom <= 1.0e-6f) {
-        state.numerical_fault = true;
-        scram(state);
+        latch_numerical_fault(state);
         rho = total_rho(state, cfg);
         n_denom = 1.0f - h * (rho - params.beta_total) / params.Lambda;
         if (!finite(n_denom) || n_denom <= 1.0e-6f) {
@@ -462,18 +470,48 @@ inline void step(ReactorState& state, const ReactorParams& params, float h) {
         compensated_add(h * dCdt[i], state.C[i], state.C_compensation[i]);
     }
 
-    if (!finite(state.n) || state.n < 0.0f) {
+    bool state_fault = false;
+    if (!finite(state.n) || state.n < 0.0f || state.n > 1.0e12f) {
         state.n = 0.0f;
-        state.numerical_fault = true;
+        state_fault = true;
     }
-    if (state.n > 1.0e12f) {
-        state.n = 1.0e12f;
-        state.numerical_fault = true;
+    if (!finite(state.Tf)) {
+        state.Tf = finite(state.Tf_ref) ? state.Tf_ref : params.Tm_const;
+        state.Tf_compensation = 0.0f;
+        state_fault = true;
     }
-    if (!finite(state.Tf) || !finite(state.Tc)) {
-        state.numerical_fault = true;
+    if (!finite(state.Tc)) {
+        state.Tc = finite(state.Tc_ref) ? state.Tc_ref : params.Tm_const;
+        state.Tc_compensation = 0.0f;
+        state_fault = true;
+    }
+    for (int i = 0; i < PRECURSOR_GROUPS; ++i) {
+        if (!finite(state.C[i]) || state.C[i] < 0.0f) {
+            state.C[i] = 0.0f;
+            state.C_compensation[i] = 0.0f;
+            state_fault = true;
+        }
+    }
+    for (int i = 0; i < DECAY_GROUPS; ++i) {
+        if (!finite(state.decay_group[i]) || state.decay_group[i] < 0.0f) {
+            state.decay_group[i] = 0.0f;
+            state.decay_compensation[i] = 0.0f;
+            state_fault = true;
+        }
+    }
+    if (!finite(state.decay_heat) || state.decay_heat < 0.0f) {
+        state.decay_heat = 0.0f;
+        state_fault = true;
     }
     compensated_add(h, state.t, state.t_compensation);
+    if (!finite(state.t)) {
+        state.t = 0.0f;
+        state.t_compensation = 0.0f;
+        state_fault = true;
+    }
+    if (state_fault) {
+        latch_numerical_fault(state);
+    }
 }
 
 inline int bounded_substeps(int requested) {
@@ -501,7 +539,9 @@ inline void advance(ReactorState& state, const ReactorParams& params, float h, i
 
     const float poison_dt = h * (float)count;
     const float N_avg = n_sum / (float)count;
-    update_poison_batched(N_avg, poison_dt, params, state.I_Xe, state.Xe, state.I_compensation, state.Xe_compensation);
+    if (update_poison_batched(N_avg, poison_dt, params, state.I_Xe, state.Xe, state.I_compensation, state.Xe_compensation)) {
+        latch_numerical_fault(state);
+    }
 }
 
 } // namespace pk
