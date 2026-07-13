@@ -1,0 +1,7 @@
+[
+  {"at_wall_s": 0.0, "command": "M0",    "label": "realtime mode before xenon run"},
+  {"at_wall_s": 0.2, "command": "C0",    "label": "PWR-SMR preset"},
+  {"at_wall_s": 0.4, "command": "P 1.0", "label": "reset full power"},
+  {"at_wall_s": 2.0, "command": "R",      "label": "SCRAM at full power"},
+  {"at_wall_s": 3.0, "command": "M2",     "label": "xenon time-compression mode"}
+]

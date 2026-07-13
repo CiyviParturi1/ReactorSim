@@ -1,0 +1,7 @@
+[
+  {"at_sim_time_s": 0.0, "command": "C0", "label": "PWR-SMR preset"},
+  {"at_sim_time_s": 0.2, "command": "P 1.0", "label": "full-power reset"},
+  {"at_sim_time_s": 0.4, "command": "M0", "label": "realtime mode"},
+  {"at_sim_time_s": 20.0, "command": "W 0.80", "label": "withdraw target +0.05"},
+  {"at_sim_time_s": 80.0, "command": "W 0.75", "label": "restore target"}
+]

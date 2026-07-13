@@ -382,6 +382,105 @@ void run_performance(const fs::path& root) {
     std::cerr << "Performance anti-optimization value: " << anti_opt << '\n';
 }
 
+void run_fpga_parity_rod(const fs::path& root, float delta, const std::string& label) {
+    const std::string scenario = "rod_" + label;
+    CsvWriter csv(output_file(root, scenario + ".csv"));
+    pk::ReactorParams params;
+    pk::ReactorState state;
+    pk::reset(state, params, 1.0f, 0);
+    const float initial_target = state.rod_target;
+    csv.row(scenario, "reset", state, params, 0.0f, 0, 0.0);
+
+    const float h = pk::TimePolicy::base_h();
+    const int substeps = 1000;
+    for (int frame = 0; frame < frame_count(180.0); ++frame) {
+        const double before = frame * OUTPUT_FRAME_S;
+        std::string event;
+        if (std::fabs(before - 20.0) < 1.0e-9) {
+            pk::set_rod_target(state, initial_target + delta);
+            event = delta > 0.0f ? "withdraw_0.05" : "insert_0.05";
+        } else if (std::fabs(before - 80.0) < 1.0e-9) {
+            pk::set_rod_target(state, initial_target);
+            event = "return_target";
+        }
+        advance_frame(state, params, h, substeps);
+        csv.row(scenario, event, state, params, h, substeps, 1.0);
+    }
+}
+
+void run_fpga_parity_preset(const fs::path& root, int mode) {
+    const std::string scenario = "preset_" + std::to_string(mode);
+    CsvWriter csv(output_file(root, scenario + ".csv"));
+    pk::ReactorParams params;
+    pk::ReactorState state;
+    pk::reset(state, params, 1.0f, mode);
+    csv.row(scenario, "reset", state, params, 0.0f, 0, 0.0);
+    const float h = pk::TimePolicy::base_h();
+    const int substeps = 1000;
+    for (int frame = 0; frame < frame_count(5.0); ++frame) {
+        advance_frame(state, params, h, substeps);
+        csv.row(scenario, "", state, params, h, substeps, 1.0);
+    }
+}
+
+void run_fpga_parity_xenon(const fs::path& root) {
+    const std::string scenario = "xenon_36h";
+    CsvWriter csv(output_file(root, scenario + ".csv"));
+    pk::ReactorParams params;
+    pk::ReactorState state;
+    pk::reset(state, params, 1.0f, 0);
+    csv.row(scenario, "reset", state, params, 0.0f, 0, 0.0);
+    for (int frame = 0; frame < frame_count(10.0); ++frame) {
+        advance_frame(state, params, pk::TimePolicy::base_h(), 1000);
+    }
+    pk::scram(state);
+    csv.row(scenario, "scram", state, params, 0.0f, 0, 0.0);
+    const float h = pk::TimePolicy::max_h();
+    const int substeps = 50000;
+    for (int frame = 0; frame < frame_count(36.0 * 3600.0, 100.0); ++frame) {
+        advance_frame(state, params, h, substeps);
+        csv.row(scenario, "xenon_batch", state, params, h, substeps, 1000.0);
+    }
+}
+
+void run_fpga_hardware_xenon_reference(const fs::path& root) {
+    const std::string scenario = "xenon_hardware_capture";
+    CsvWriter csv(output_file(root, scenario + ".csv"));
+    pk::ReactorParams params;
+    pk::ReactorState state;
+    pk::reset(state, params, 1.0f, 0);
+    csv.row(scenario, "reset", state, params, 0.0f, 0, 0.0);
+
+    // Match the recorded physical command timeline: SCRAM arrived at 1.6 s;
+    // M2 was selected after ten 0.1 s realtime frames, at 2.6 s.
+    for (int frame = 0; frame < 16; ++frame) {
+        advance_frame(state, params, pk::TimePolicy::base_h(), 1000);
+        csv.row(scenario, "", state, params, pk::TimePolicy::base_h(), 1000, 1.0);
+    }
+    pk::scram(state);
+    for (int frame = 0; frame < 10; ++frame) {
+        advance_frame(state, params, pk::TimePolicy::base_h(), 1000);
+        csv.row(scenario, frame == 0 ? "scram" : "", state, params, pk::TimePolicy::base_h(), 1000, 1.0);
+    }
+    const float h = pk::TimePolicy::max_h();
+    const int substeps = 50000;
+    for (int frame = 0; frame < 1297; ++frame) {
+        advance_frame(state, params, h, substeps);
+        csv.row(scenario, "xenon_batch", state, params, h, substeps, 1000.0);
+    }
+}
+
+void run_fpga_parity_references(const fs::path& root) {
+    fs::create_directories(root);
+    run_fpga_parity_rod(root, 0.05f, "withdrawal");
+    run_fpga_parity_rod(root, -0.05f, "insertion");
+    for (int mode = 0; mode < 3; ++mode) {
+        run_fpga_parity_preset(root, mode);
+    }
+    run_fpga_parity_xenon(root);
+    run_fpga_hardware_xenon_reference(root);
+}
+
 void run_campaign(const fs::path& root) {
     fs::create_directories(root);
     for (const float power : {0.10f, 0.50f, 1.00f, 1.50f}) {
@@ -408,12 +507,15 @@ void run_campaign(const fs::path& root) {
 
 int main(int argc, char** argv) {
     fs::path output = fs::path("experiments") / "results" / "latest";
+    bool fpga_parity = false;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
         if (argument == "--output-dir" && i + 1 < argc) {
             output = argv[++i];
+        } else if (argument == "--fpga-parity") {
+            fpga_parity = true;
         } else if (argument == "--help") {
-            std::cout << "Usage: run_pc_campaign [--output-dir DIR]\n";
+            std::cout << "Usage: run_pc_campaign [--output-dir DIR] [--fpga-parity]\n";
             return 0;
         } else {
             std::cerr << "Unknown argument: " << argument << '\n';
@@ -422,7 +524,11 @@ int main(int argc, char** argv) {
     }
 
     try {
-        run_campaign(output);
+        if (fpga_parity) {
+            run_fpga_parity_references(output);
+        } else {
+            run_campaign(output);
+        }
     } catch (const std::exception& error) {
         std::cerr << "Campaign failed: " << error.what() << '\n';
         return 1;

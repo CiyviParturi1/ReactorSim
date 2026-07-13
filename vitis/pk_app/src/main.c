@@ -365,7 +365,10 @@ static void poll_uart_commands(AppState *state)
 
 static float elapsed_seconds(XTime start, XTime end)
 {
-    return (float)(end - start) / (float)COUNTS_PER_SECOND;
+    /* COUNTS_PER_SECOND expands to CPU_CLOCK/2 in the Zynq BSP.  Keep the
+     * expansion parenthesized or C parses delta / CPU_CLOCK / 2, making every
+     * measured duration four times too small. */
+    return (float)(end - start) / (float)(COUNTS_PER_SECOND);
 }
 
 int main()
@@ -397,6 +400,8 @@ int main()
     u32 prev_sw = XGpio_DiscreteRead(&gpio, GPIO_CHANNEL);
     XTime previous_frame_start;
     int have_previous_frame = 0;
+    float previous_sim_time = 0.0f;
+    int have_previous_sim_time = 0;
     XTime_GetTime(&previous_frame_start);
 
     xil_printf("\r\nDATA_START\r\n");
@@ -406,19 +411,14 @@ int main()
         XTime end_time;
         XTime frame_start_time;
         XTime frame_end_time;
+        float measured_interval = WALL_OUTPUT_INTERVAL;
 
         XTime_GetTime(&frame_start_time);
-        {
-            float measured_interval = WALL_OUTPUT_INTERVAL;
-            if (have_previous_frame) {
-                measured_interval = elapsed_seconds(previous_frame_start, frame_start_time);
-            }
-            have_previous_frame = 1;
-            if (measured_interval > 0.0f) {
-                state.reported_factor = ((float)state.substeps * state.h) / measured_interval;
-            }
-            previous_frame_start = frame_start_time;
+        if (have_previous_frame && frame_start_time >= previous_frame_start) {
+            measured_interval = elapsed_seconds(previous_frame_start, frame_start_time);
         }
+        have_previous_frame = 1;
+        previous_frame_start = frame_start_time;
         poll_uart_commands(&state);
 
         u32 sw = XGpio_DiscreteRead(&gpio, GPIO_CHANNEL);
@@ -465,6 +465,13 @@ int main()
         float decay_heat = pk_read_float(PK_DECAY_OUT);
         float plant_mode = pk_read_float(PK_PLANT_OUT);
         float scram_active = pk_read_float(PK_SCRAM_ACTIVE);
+        if (have_previous_sim_time && measured_interval > 0.0f && t >= previous_sim_time) {
+            state.reported_factor = (t - previous_sim_time) / measured_interval;
+        } else {
+            state.reported_factor = state.tc_factor;
+        }
+        previous_sim_time = t;
+        have_previous_sim_time = 1;
         float step_real_time = elapsed_seconds(start_time, end_time) / (float)state.substeps;
         int active_mode = (int)plant_mode;
         float beta = PK_BETA_TOTAL;

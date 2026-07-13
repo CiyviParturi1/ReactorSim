@@ -1,0 +1,4 @@
+[
+  {"at_sim_time_s": 0.0, "command": "C0", "label": "PWR-SMR preset parity reset"},
+  {"at_sim_time_s": 0.2, "command": "M0", "label": "realtime mode"}
+]

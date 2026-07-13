@@ -1,0 +1,20 @@
+[
+  {"at_wall_s": 0.0,  "command": "C0",     "label": "PWR-SMR preset"},
+  {"at_wall_s": 1.0,  "command": "P 1.0",  "label": "reset full power"},
+  {"at_wall_s": 2.0,  "command": "W 0.80", "label": "set rod target"},
+  {"at_wall_s": 3.0,  "command": "+",      "label": "withdraw target"},
+  {"at_wall_s": 4.0,  "command": "-",      "label": "insert target"},
+  {"at_wall_s": 5.0,  "command": "R",      "label": "SCRAM"},
+  {"at_wall_s": 6.0,  "command": "+",      "label": "withdraw blocked during SCRAM"},
+  {"at_wall_s": 7.0,  "command": "-",      "label": "insert blocked during SCRAM"},
+  {"at_wall_s": 8.0,  "command": "W 0.75", "label": "target blocked during SCRAM"},
+  {"at_wall_s": 9.0,  "command": "K",      "label": "clear SCRAM"},
+  {"at_wall_s": 10.0, "command": "+",      "label": "withdraw restored after clear"},
+  {"at_wall_s": 11.0, "command": "C1",     "label": "RBMK-like preset"},
+  {"at_wall_s": 12.0, "command": "C2",     "label": "cooling-loss preset"},
+  {"at_wall_s": 13.0, "command": "M1",     "label": "training mode"},
+  {"at_wall_s": 16.0, "command": "M2",     "label": "xenon mode"},
+  {"at_wall_s": 20.0, "command": "M0",     "label": "realtime mode"},
+  {"at_wall_s": 21.0, "command": "C0",     "label": "restore PWR-SMR"},
+  {"at_wall_s": 22.0, "command": "P 1.0",  "label": "restore full power"}
+]
