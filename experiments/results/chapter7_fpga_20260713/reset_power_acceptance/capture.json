@@ -1,0 +1,48 @@
+{
+  "started_utc": "2026-07-13T11:41:54.232154+00:00",
+  "port": "COM7",
+  "baud": 115200,
+  "test_name": "reset_power_acceptance",
+  "data_start_seen": 0,
+  "malformed_rows": 0,
+  "wrong_field_counts": 0,
+  "non_finite_values": 0,
+  "serial_disconnects": 0,
+  "pre_sync_discarded_lines": 1,
+  "schedule": [
+    {
+      "at_wall_s": 0.0,
+      "command": "M0",
+      "label": "realtime mode"
+    },
+    {
+      "at_wall_s": 0.2,
+      "command": "C0",
+      "label": "PWR-SMR preset"
+    },
+    {
+      "at_wall_s": 0.5,
+      "command": "P 0.1",
+      "label": "30 s stability at P0=0.1"
+    },
+    {
+      "at_wall_s": 31.0,
+      "command": "P 0.5",
+      "label": "30 s stability at P0=0.5"
+    },
+    {
+      "at_wall_s": 61.5,
+      "command": "P 1.0",
+      "label": "30 s stability at P0=1.0"
+    },
+    {
+      "at_wall_s": 92.0,
+      "command": "P 1.5",
+      "label": "30 s stability at P0=1.5"
+    }
+  ],
+  "finished_utc": "2026-07-13T11:43:57.254138+00:00",
+  "elapsed_wall_s": 123.03100000000086,
+  "last_sim_time_s": 31.0,
+  "unexecuted_schedule_events": []
+}

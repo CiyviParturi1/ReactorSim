@@ -1,0 +1,67 @@
+{
+  "rows_received": 1327,
+  "rows_in_latest_execution_epoch": 1323,
+  "data_start_seen": 0,
+  "malformed_rows": 0,
+  "wrong_field_counts": 0,
+  "non_finite_values": 0,
+  "simulation_time_reversals": 2,
+  "restart_events": 2,
+  "restarts_confirmed_by_data_start": false,
+  "invalid_engine_states": 0,
+  "serial_disconnects": 0,
+  "frame_interval_s": {
+    "count": 1322,
+    "min": 0.09299999999998931,
+    "mean": 0.1000143721633888,
+    "median": 0.0940000000000012,
+    "p95": 0.10999999999999943,
+    "max": 0.15700000000000003
+  },
+  "simulated_frame_advance_s": {
+    "count": 1322,
+    "min": 0.09999999999999964,
+    "mean": 98.1108240355522,
+    "median": 100.0,
+    "p95": 100.0,
+    "max": 100.00781199999619
+  },
+  "host_observed_factor": {
+    "count": 1322,
+    "min": 0.9174311926605473,
+    "mean": 986.7522922560659,
+    "median": 1063.829787234029,
+    "p95": 1075.2688172042604,
+    "max": 1075.3528172042195
+  },
+  "per_substep_execution_s": {
+    "count": 1323,
+    "min": 1.11e-06,
+    "mean": 1.1100597127739985e-06,
+    "median": 1.11e-06,
+    "p95": 1.11e-06,
+    "max": 1.114e-06
+  },
+  "achieved_factor": {
+    "count": 1323,
+    "min": 1.0,
+    "mean": 980.6666175404384,
+    "median": 1000.304565,
+    "p95": 1000.307922,
+    "max": 1000.855103
+  },
+  "missed_100ms_frames": 1,
+  "sim_time_start_s": 0.1,
+  "sim_time_end_s": 129702.609375,
+  "analysis_scope": "latest continuous execution epoch",
+  "acceptance": {
+    "data_start": false,
+    "exactly_23_fields": true,
+    "finite": true,
+    "monotonic_time": false,
+    "valid_engine": true
+  },
+  "notes": {
+    "missed_frame_definition": "estimated skipped frames for UART intervals >150 ms"
+  }
+}

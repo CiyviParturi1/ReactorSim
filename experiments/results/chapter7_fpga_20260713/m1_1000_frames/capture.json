@@ -1,0 +1,23 @@
+{
+  "started_utc": "2026-07-13T11:37:55.711885+00:00",
+  "port": "COM7",
+  "baud": 115200,
+  "test_name": "m1_1000_frames",
+  "data_start_seen": 0,
+  "malformed_rows": 0,
+  "wrong_field_counts": 0,
+  "non_finite_values": 0,
+  "serial_disconnects": 0,
+  "pre_sync_discarded_lines": 1,
+  "schedule": [
+    {
+      "at_wall_s": 0.0,
+      "command": "M1",
+      "label": "select measured training mode"
+    }
+  ],
+  "finished_utc": "2026-07-13T11:39:40.777819+00:00",
+  "elapsed_wall_s": 105.0619999999999,
+  "last_sim_time_s": 1204.699951,
+  "unexecuted_schedule_events": []
+}

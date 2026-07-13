@@ -1,0 +1,49 @@
+{
+  "generated_utc": "2026-07-13T12:41:18.193051+00:00",
+  "purpose": "Chapter 7 physical ZedBoard hardware acceptance evidence",
+  "source": {
+    "commit": "f88357b86f7439259f0ef71e15248823c49f1328",
+    "branch": "main",
+    "tree_dirty": true,
+    "tree_status": "?? experiments/results/chapter7_fpga_20260713/"
+  },
+  "board": {
+    "model": "ZedBoard XC7Z020",
+    "serial": "not reported by Windows; COM7 USB serial"
+  },
+  "target": {
+    "clock_frequency_mhz": 100.0,
+    "uart_port": "COM7",
+    "uart_baud": 115200
+  },
+  "tools": {
+    "vivado": "Vivado 2025.2",
+    "vitis": "Vitis 2025.2"
+  },
+  "artifacts": {
+    "bitstream": {
+      "path": "vitis/pk_app_clean/_ide/bitstream/pk.bit",
+      "present": true,
+      "bytes": 4045690,
+      "modified_utc": "2026-07-11T18:23:00.727767+00:00",
+      "sha256": "6a2b79692e16b590d5c05e51494b872f9909679e7b30cd2d7615af208de52625"
+    },
+    "xsa": {
+      "path": "build/hardware/pk.xsa",
+      "present": true,
+      "bytes": 955997,
+      "modified_utc": "2026-07-11T17:44:11.709022+00:00",
+      "sha256": "17af2d884b3ee2842516b21e62ad79e2ee302b02de00609548a587d1cfec468a"
+    },
+    "elf": {
+      "path": "vitis/pk_app_clean/build/pk_app_clean.elf",
+      "present": true,
+      "bytes": 213556,
+      "modified_utc": "2026-07-13T11:09:01.509938+00:00",
+      "sha256": "1448058fb2c47576c465cfd86cc03bc52556e5adc9bd458437cf7b1ef2825932"
+    }
+  },
+  "operator": {
+    "test_started_utc": "2026-07-13T09:22:33.792220+00:00"
+  }
+}

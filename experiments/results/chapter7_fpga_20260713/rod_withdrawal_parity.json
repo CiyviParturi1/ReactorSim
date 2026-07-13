@@ -1,0 +1,59 @@
+{
+  "fpga_csv": "experiments\\results\\chapter7_fpga_20260713\\rod_withdrawal\\telemetry.csv",
+  "pc_csv": "experiments\\results\\chapter7_pc_fpga_parity_20260713\\rod_withdrawal.csv",
+  "tolerance": 2e-05,
+  "alignment": "absolute_simulated_time",
+  "fpga_time_origin_s": 0.0,
+  "pc_time_origin_s": 0.0,
+  "variables": {
+    "N": {
+      "points": 1800,
+      "rmse": 4.2856310440234965e-07,
+      "max_abs": 3.7790000000370583e-06,
+      "within_scaled_tolerance": true
+    },
+    "T_f": {
+      "points": 1800,
+      "rmse": 4.69731657848477e-05,
+      "max_abs": 0.00012331075947713543,
+      "within_scaled_tolerance": true
+    },
+    "T_c": {
+      "points": 1800,
+      "rmse": 9.601363627175008e-06,
+      "max_abs": 3.104643610640778e-05,
+      "within_scaled_tolerance": true
+    },
+    "I": {
+      "points": 1800,
+      "rmse": 2.6895019609913447e-07,
+      "max_abs": 4.999974718700173e-07,
+      "within_scaled_tolerance": true
+    },
+    "Xe": {
+      "points": 1800,
+      "rmse": 2.8265167901655707e-07,
+      "max_abs": 5.310000000813275e-07,
+      "within_scaled_tolerance": true
+    },
+    "rho": {
+      "points": 1800,
+      "rmse": 2.6705155258749524e-07,
+      "max_abs": 4.993538647112487e-07,
+      "within_scaled_tolerance": true
+    },
+    "P_decay": {
+      "points": 1800,
+      "rmse": 2.7639624191221995e-07,
+      "max_abs": 5.110311011163882e-07,
+      "within_scaled_tolerance": true
+    },
+    "rod_position": {
+      "points": 1800,
+      "rmse": 8.861943188894457e-08,
+      "max_abs": 5.801066472743699e-07,
+      "within_scaled_tolerance": true
+    }
+  },
+  "all_variables_within_scaled_tolerance": true
+}

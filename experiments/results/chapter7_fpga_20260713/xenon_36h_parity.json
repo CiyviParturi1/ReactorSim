@@ -1,0 +1,59 @@
+{
+  "fpga_csv": "experiments\\results\\chapter7_fpga_20260713\\xenon_36h\\telemetry.csv",
+  "pc_csv": "experiments\\results\\chapter7_pc_fpga_parity_20260713\\xenon_hardware_capture.csv",
+  "tolerance": 2e-05,
+  "alignment": "scram",
+  "fpga_time_origin_s": 1.7,
+  "pc_time_origin_s": 1.699999928,
+  "variables": {
+    "N": {
+      "points": 1323,
+      "rmse": 3.356523281833457e-08,
+      "max_abs": 4.994253624669167e-07,
+      "within_scaled_tolerance": true
+    },
+    "T_f": {
+      "points": 1323,
+      "rmse": 2.9711191390079714e-07,
+      "max_abs": 7.307749001483899e-07,
+      "within_scaled_tolerance": true
+    },
+    "T_c": {
+      "points": 1323,
+      "rmse": 2.9133150803398595e-07,
+      "max_abs": 5.001436420570826e-07,
+      "within_scaled_tolerance": true
+    },
+    "I": {
+      "points": 1323,
+      "rmse": 5.316265915831317e-06,
+      "max_abs": 8.136333880970348e-06,
+      "within_scaled_tolerance": true
+    },
+    "Xe": {
+      "points": 1323,
+      "rmse": 1.2587451427539938e-05,
+      "max_abs": 1.6740238492740644e-05,
+      "within_scaled_tolerance": true
+    },
+    "rho": {
+      "points": 1323,
+      "rmse": 3.894975676033969e-07,
+      "max_abs": 8.275807838326044e-07,
+      "within_scaled_tolerance": true
+    },
+    "P_decay": {
+      "points": 1323,
+      "rmse": 2.8640000654682053e-07,
+      "max_abs": 5.000375957768186e-07,
+      "within_scaled_tolerance": true
+    },
+    "rod_position": {
+      "points": 1323,
+      "rmse": 8.999571072180305e-09,
+      "max_abs": 2.3209994759465502e-07,
+      "within_scaled_tolerance": true
+    }
+  },
+  "all_variables_within_scaled_tolerance": true
+}

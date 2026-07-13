@@ -1,0 +1,752 @@
+{
+  "metadata": {
+    "generated_utc": "2026-07-13T12:41:18.193051+00:00",
+    "purpose": "Chapter 7 physical ZedBoard hardware acceptance evidence",
+    "source": {
+      "commit": "f88357b86f7439259f0ef71e15248823c49f1328",
+      "branch": "main",
+      "tree_dirty": true,
+      "tree_status": "?? experiments/results/chapter7_fpga_20260713/"
+    },
+    "board": {
+      "model": "ZedBoard XC7Z020",
+      "serial": "not reported by Windows; COM7 USB serial"
+    },
+    "target": {
+      "clock_frequency_mhz": 100.0,
+      "uart_port": "COM7",
+      "uart_baud": 115200
+    },
+    "tools": {
+      "vivado": "Vivado 2025.2",
+      "vitis": "Vitis 2025.2"
+    },
+    "artifacts": {
+      "bitstream": {
+        "path": "vitis/pk_app_clean/_ide/bitstream/pk.bit",
+        "present": true,
+        "bytes": 4045690,
+        "modified_utc": "2026-07-11T18:23:00.727767+00:00",
+        "sha256": "6a2b79692e16b590d5c05e51494b872f9909679e7b30cd2d7615af208de52625"
+      },
+      "xsa": {
+        "path": "build/hardware/pk.xsa",
+        "present": true,
+        "bytes": 955997,
+        "modified_utc": "2026-07-11T17:44:11.709022+00:00",
+        "sha256": "17af2d884b3ee2842516b21e62ad79e2ee302b02de00609548a587d1cfec468a"
+      },
+      "elf": {
+        "path": "vitis/pk_app_clean/build/pk_app_clean.elf",
+        "present": true,
+        "bytes": 213556,
+        "modified_utc": "2026-07-13T11:09:01.509938+00:00",
+        "sha256": "1448058fb2c47576c465cfd86cc03bc52556e5adc9bd458437cf7b1ef2825932"
+      }
+    },
+    "operator": {
+      "test_started_utc": "2026-07-13T09:22:33.792220+00:00"
+    }
+  },
+  "physical_acceptance": [
+    {
+      "test": "m0_1000_frames",
+      "rows": 1051,
+      "latest_epoch_rows": 1051,
+      "restarts": 0,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": true,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "m1_1000_frames",
+      "rows": 1051,
+      "latest_epoch_rows": 1051,
+      "restarts": 0,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": true,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "m2_1000_frames",
+      "rows": 1050,
+      "latest_epoch_rows": 1050,
+      "restarts": 0,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": true,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 1
+    },
+    {
+      "test": "preset_0_parity",
+      "rows": 60,
+      "latest_epoch_rows": 59,
+      "restarts": 1,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": false,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "preset_1_parity",
+      "rows": 60,
+      "latest_epoch_rows": 59,
+      "restarts": 1,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": false,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "preset_2_parity",
+      "rows": 60,
+      "latest_epoch_rows": 59,
+      "restarts": 1,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": false,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "reset_power_acceptance",
+      "rows": 1231,
+      "latest_epoch_rows": 310,
+      "restarts": 5,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": false,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "rod_insertion",
+      "rows": 1801,
+      "latest_epoch_rows": 1800,
+      "restarts": 1,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": false,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "rod_withdrawal",
+      "rows": 1803,
+      "latest_epoch_rows": 1800,
+      "restarts": 2,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": false,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "uart_command_acceptance",
+      "rows": 250,
+      "latest_epoch_rows": 30,
+      "restarts": 6,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": false,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 0
+    },
+    {
+      "test": "xenon_36h",
+      "rows": 1327,
+      "latest_epoch_rows": 1323,
+      "restarts": 2,
+      "DATA_START": false,
+      "23_fields": true,
+      "finite": true,
+      "monotonic_time": false,
+      "engine_valid": true,
+      "malformed": 0,
+      "missed_frames": 1
+    }
+  ],
+  "execution_timing": [
+    {
+      "test": "m0_1000_frames",
+      "frames": 1051,
+      "achieved_factor_mean": 1.0008560770694577,
+      "host_observed_factor_mean": 1.0064724728772056,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.113e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.113e-06,
+      "frame_p95_s": 0.10999999999999943,
+      "missed_frames": 0
+    },
+    {
+      "test": "m1_1000_frames",
+      "frames": 1051,
+      "achieved_factor_mean": 9.999985090390105,
+      "host_observed_factor_mean": 10.06428048350412,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.113e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.113e-06,
+      "frame_p95_s": 0.10999999999999943,
+      "missed_frames": 0
+    },
+    {
+      "test": "m2_1000_frames",
+      "frames": 1050,
+      "achieved_factor_mean": 999.3627278657143,
+      "host_observed_factor_mean": 1005.6539261233806,
+      "substep_min_s": 1.11e-06,
+      "substep_mean_s": 1.110002857142857e-06,
+      "substep_median_s": 1.11e-06,
+      "substep_p95_s": 1.11e-06,
+      "substep_max_s": 1.113e-06,
+      "frame_p95_s": 0.10999999999999943,
+      "missed_frames": 1
+    },
+    {
+      "test": "preset_0_parity",
+      "frames": 60,
+      "achieved_factor_mean": 1.0008422711864406,
+      "host_observed_factor_mean": 1.0067902787240668,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.1130169491525423e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.114e-06,
+      "frame_p95_s": 0.11000000000000032,
+      "missed_frames": 0
+    },
+    {
+      "test": "preset_1_parity",
+      "frames": 60,
+      "achieved_factor_mean": 1.000841559322034,
+      "host_observed_factor_mean": 1.0068437053861465,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.1130169491525423e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.114e-06,
+      "frame_p95_s": 0.11000000000000032,
+      "missed_frames": 0
+    },
+    {
+      "test": "preset_2_parity",
+      "frames": 60,
+      "achieved_factor_mean": 1.0008409491525423,
+      "host_observed_factor_mean": 1.0118123849595497,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.1130169491525423e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.114e-06,
+      "frame_p95_s": 0.10999999999999999,
+      "missed_frames": 0
+    },
+    {
+      "test": "reset_power_acceptance",
+      "frames": 1231,
+      "achieved_factor_mean": 1.0008528580645162,
+      "host_observed_factor_mean": 1.0060930311197496,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.1130032258064515e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.114e-06,
+      "frame_p95_s": 0.10999999999999943,
+      "missed_frames": 0
+    },
+    {
+      "test": "rod_insertion",
+      "frames": 1801,
+      "achieved_factor_mean": 1.0008551511111112,
+      "host_observed_factor_mean": 1.0064584663550449,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.1130005555555555e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.114e-06,
+      "frame_p95_s": 0.10999999999999943,
+      "missed_frames": 0
+    },
+    {
+      "test": "rod_withdrawal",
+      "frames": 1803,
+      "achieved_factor_mean": 1.0008552183333332,
+      "host_observed_factor_mean": 1.006492731820884,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.1130005555555555e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.114e-06,
+      "frame_p95_s": 0.10999999999999943,
+      "missed_frames": 0
+    },
+    {
+      "test": "uart_command_acceptance",
+      "frames": 250,
+      "achieved_factor_mean": 1.0008284333333333,
+      "host_observed_factor_mean": 1.0032510584450138,
+      "substep_min_s": 1.113e-06,
+      "substep_mean_s": 1.1130333333333334e-06,
+      "substep_median_s": 1.113e-06,
+      "substep_p95_s": 1.113e-06,
+      "substep_max_s": 1.114e-06,
+      "frame_p95_s": 0.10900000000000176,
+      "missed_frames": 0
+    },
+    {
+      "test": "xenon_36h",
+      "frames": 1327,
+      "achieved_factor_mean": 980.6666175404384,
+      "host_observed_factor_mean": 986.7522922560659,
+      "substep_min_s": 1.11e-06,
+      "substep_mean_s": 1.1100597127739985e-06,
+      "substep_median_s": 1.11e-06,
+      "substep_p95_s": 1.11e-06,
+      "substep_max_s": 1.114e-06,
+      "frame_p95_s": 0.10999999999999943,
+      "missed_frames": 1
+    }
+  ],
+  "xenon": {
+    "scram_time_s": 1.7,
+    "duration_after_scram_h": 36.02803038194445,
+    "iodine_at_xenon_peak": 0.466073,
+    "maximum_xenon_ratio": 1.503229,
+    "xenon_peak_time_h": 7.389139323055556,
+    "maximum_xenon_worth_dollars": -1.4378571428571427,
+    "xenon_worth_time_h": 7.389139323055556,
+    "return_within_1pct_h": 20.805805989722224,
+    "maximum_critical_rod_position": 0.857886
+  },
+  "parity": [
+    {
+      "fpga_csv": "experiments\\results\\chapter7_fpga_20260713\\preset_0_parity\\telemetry.csv",
+      "pc_csv": "experiments\\results\\chapter7_pc_fpga_parity_20260713\\preset_0.csv",
+      "tolerance": 2e-05,
+      "alignment": "absolute_simulated_time",
+      "fpga_time_origin_s": 0.0,
+      "pc_time_origin_s": 0.0,
+      "variables": {
+        "N": {
+          "points": 50,
+          "rmse": 0.0,
+          "max_abs": 0.0,
+          "within_scaled_tolerance": true
+        },
+        "T_f": {
+          "points": 50,
+          "rmse": 0.0,
+          "max_abs": 0.0,
+          "within_scaled_tolerance": true
+        },
+        "T_c": {
+          "points": 50,
+          "rmse": 0.0,
+          "max_abs": 0.0,
+          "within_scaled_tolerance": true
+        },
+        "I": {
+          "points": 50,
+          "rmse": 0.0,
+          "max_abs": 0.0,
+          "within_scaled_tolerance": true
+        },
+        "Xe": {
+          "points": 50,
+          "rmse": 0.0,
+          "max_abs": 0.0,
+          "within_scaled_tolerance": true
+        },
+        "rho": {
+          "points": 50,
+          "rmse": 0.0,
+          "max_abs": 0.0,
+          "within_scaled_tolerance": true
+        },
+        "P_decay": {
+          "points": 50,
+          "rmse": 3.6000000203095794e-10,
+          "max_abs": 3.6000000203095794e-10,
+          "within_scaled_tolerance": true
+        },
+        "rod_position": {
+          "points": 50,
+          "rmse": 5.96000000463448e-08,
+          "max_abs": 5.96000000463448e-08,
+          "within_scaled_tolerance": true
+        }
+      },
+      "all_variables_within_scaled_tolerance": true
+    },
+    {
+      "fpga_csv": "experiments\\results\\chapter7_fpga_20260713\\preset_1_parity\\telemetry.csv",
+      "pc_csv": "experiments\\results\\chapter7_pc_fpga_parity_20260713\\preset_1.csv",
+      "tolerance": 2e-05,
+      "alignment": "absolute_simulated_time",
+      "fpga_time_origin_s": 0.0,
+      "pc_time_origin_s": 0.0,
+      "variables": {
+        "N": {
+          "points": 50,
+          "rmse": 2.769101958542593e-07,
+          "max_abs": 4.959999999609721e-07,
+          "within_scaled_tolerance": true
+        },
+        "T_f": {
+          "points": 50,
+          "rmse": 2.9037743116766936e-07,
+          "max_abs": 5.481260814121924e-07,
+          "within_scaled_tolerance": true
+        },
+        "T_c": {
+          "points": 50,
+          "rmse": 3.0367593278602174e-07,
+          "max_abs": 5.885117388970684e-07,
+          "within_scaled_tolerance": true
+        },
+        "I": {
+          "points": 50,
+          "rmse": 2.580523193815135e-07,
+          "max_abs": 4.770001700293847e-07,
+          "within_scaled_tolerance": true
+        },
+        "Xe": {
+          "points": 50,
+          "rmse": 2.741829698621118e-07,
+          "max_abs": 4.7680002868144555e-07,
+          "within_scaled_tolerance": true
+        },
+        "rho": {
+          "points": 50,
+          "rmse": 2.8752263713141177e-07,
+          "max_abs": 4.96596145153902e-07,
+          "within_scaled_tolerance": true
+        },
+        "P_decay": {
+          "points": 50,
+          "rmse": 2.602595345130864e-07,
+          "max_abs": 4.937199279964055e-07,
+          "within_scaled_tolerance": true
+        },
+        "rod_position": {
+          "points": 50,
+          "rmse": 4.154999999617104e-07,
+          "max_abs": 4.154999999617104e-07,
+          "within_scaled_tolerance": true
+        }
+      },
+      "all_variables_within_scaled_tolerance": true
+    },
+    {
+      "fpga_csv": "experiments\\results\\chapter7_fpga_20260713\\preset_2_parity\\telemetry.csv",
+      "pc_csv": "experiments\\results\\chapter7_pc_fpga_parity_20260713\\preset_2.csv",
+      "tolerance": 2e-05,
+      "alignment": "absolute_simulated_time",
+      "fpga_time_origin_s": 0.0,
+      "pc_time_origin_s": 0.0,
+      "variables": {
+        "N": {
+          "points": 50,
+          "rmse": 3.2213908439105294e-07,
+          "max_abs": 5.190680055777719e-07,
+          "within_scaled_tolerance": true
+        },
+        "T_f": {
+          "points": 50,
+          "rmse": 2.891808776922721e-07,
+          "max_abs": 5.772428721684264e-07,
+          "within_scaled_tolerance": true
+        },
+        "T_c": {
+          "points": 50,
+          "rmse": 8.590192101779053e-07,
+          "max_abs": 2.4963768510133377e-06,
+          "within_scaled_tolerance": true
+        },
+        "I": {
+          "points": 50,
+          "rmse": 2.744627281611956e-07,
+          "max_abs": 5.034003415227417e-07,
+          "within_scaled_tolerance": true
+        },
+        "Xe": {
+          "points": 50,
+          "rmse": 2.729124314569144e-07,
+          "max_abs": 4.770000856524348e-07,
+          "within_scaled_tolerance": true
+        },
+        "rho": {
+          "points": 50,
+          "rmse": 3.0736461337731567e-07,
+          "max_abs": 4.968996900000074e-07,
+          "within_scaled_tolerance": true
+        },
+        "P_decay": {
+          "points": 50,
+          "rmse": 2.6214308501949643e-07,
+          "max_abs": 4.921762544740638e-07,
+          "within_scaled_tolerance": true
+        },
+        "rod_position": {
+          "points": 50,
+          "rmse": 5.96000000463448e-08,
+          "max_abs": 5.96000000463448e-08,
+          "within_scaled_tolerance": true
+        }
+      },
+      "all_variables_within_scaled_tolerance": true
+    },
+    {
+      "fpga_csv": "experiments\\results\\chapter7_fpga_20260713\\rod_insertion\\telemetry.csv",
+      "pc_csv": "experiments\\results\\chapter7_pc_fpga_parity_20260713\\rod_insertion.csv",
+      "tolerance": 2e-05,
+      "alignment": "absolute_simulated_time",
+      "fpga_time_origin_s": 0.0,
+      "pc_time_origin_s": 0.0,
+      "variables": {
+        "N": {
+          "points": 1800,
+          "rmse": 2.930024138189189e-07,
+          "max_abs": 1.8851000596065148e-06,
+          "within_scaled_tolerance": true
+        },
+        "T_f": {
+          "points": 1800,
+          "rmse": 9.521341531726376e-06,
+          "max_abs": 6.246952136734762e-05,
+          "within_scaled_tolerance": true
+        },
+        "T_c": {
+          "points": 1800,
+          "rmse": 2.4099302418429328e-06,
+          "max_abs": 3.111753750317803e-05,
+          "within_scaled_tolerance": true
+        },
+        "I": {
+          "points": 1800,
+          "rmse": 2.768631220598642e-07,
+          "max_abs": 5.312029441872923e-07,
+          "within_scaled_tolerance": true
+        },
+        "Xe": {
+          "points": 1800,
+          "rmse": 2.5774349779640543e-07,
+          "max_abs": 4.999996421339858e-07,
+          "within_scaled_tolerance": true
+        },
+        "rho": {
+          "points": 1800,
+          "rmse": 2.707764419915112e-07,
+          "max_abs": 4.996672399999968e-07,
+          "within_scaled_tolerance": true
+        },
+        "P_decay": {
+          "points": 1800,
+          "rmse": 2.7226518299064853e-07,
+          "max_abs": 5.05232972701497e-07,
+          "within_scaled_tolerance": true
+        },
+        "rod_position": {
+          "points": 1800,
+          "rmse": 9.341887969490809e-08,
+          "max_abs": 5.820375162945979e-07,
+          "within_scaled_tolerance": true
+        }
+      },
+      "all_variables_within_scaled_tolerance": true
+    },
+    {
+      "fpga_csv": "experiments\\results\\chapter7_fpga_20260713\\rod_withdrawal\\telemetry.csv",
+      "pc_csv": "experiments\\results\\chapter7_pc_fpga_parity_20260713\\rod_withdrawal.csv",
+      "tolerance": 2e-05,
+      "alignment": "absolute_simulated_time",
+      "fpga_time_origin_s": 0.0,
+      "pc_time_origin_s": 0.0,
+      "variables": {
+        "N": {
+          "points": 1800,
+          "rmse": 4.2856310440234965e-07,
+          "max_abs": 3.7790000000370583e-06,
+          "within_scaled_tolerance": true
+        },
+        "T_f": {
+          "points": 1800,
+          "rmse": 4.69731657848477e-05,
+          "max_abs": 0.00012331075947713543,
+          "within_scaled_tolerance": true
+        },
+        "T_c": {
+          "points": 1800,
+          "rmse": 9.601363627175008e-06,
+          "max_abs": 3.104643610640778e-05,
+          "within_scaled_tolerance": true
+        },
+        "I": {
+          "points": 1800,
+          "rmse": 2.6895019609913447e-07,
+          "max_abs": 4.999974718700173e-07,
+          "within_scaled_tolerance": true
+        },
+        "Xe": {
+          "points": 1800,
+          "rmse": 2.8265167901655707e-07,
+          "max_abs": 5.310000000813275e-07,
+          "within_scaled_tolerance": true
+        },
+        "rho": {
+          "points": 1800,
+          "rmse": 2.6705155258749524e-07,
+          "max_abs": 4.993538647112487e-07,
+          "within_scaled_tolerance": true
+        },
+        "P_decay": {
+          "points": 1800,
+          "rmse": 2.7639624191221995e-07,
+          "max_abs": 5.110311011163882e-07,
+          "within_scaled_tolerance": true
+        },
+        "rod_position": {
+          "points": 1800,
+          "rmse": 8.861943188894457e-08,
+          "max_abs": 5.801066472743699e-07,
+          "within_scaled_tolerance": true
+        }
+      },
+      "all_variables_within_scaled_tolerance": true
+    },
+    {
+      "fpga_csv": "experiments\\results\\chapter7_fpga_20260713\\xenon_36h\\telemetry.csv",
+      "pc_csv": "experiments\\results\\chapter7_pc_fpga_parity_20260713\\xenon_hardware_capture.csv",
+      "tolerance": 2e-05,
+      "alignment": "scram",
+      "fpga_time_origin_s": 1.7,
+      "pc_time_origin_s": 1.699999928,
+      "variables": {
+        "N": {
+          "points": 1323,
+          "rmse": 3.356523281833457e-08,
+          "max_abs": 4.994253624669167e-07,
+          "within_scaled_tolerance": true
+        },
+        "T_f": {
+          "points": 1323,
+          "rmse": 2.9711191390079714e-07,
+          "max_abs": 7.307749001483899e-07,
+          "within_scaled_tolerance": true
+        },
+        "T_c": {
+          "points": 1323,
+          "rmse": 2.9133150803398595e-07,
+          "max_abs": 5.001436420570826e-07,
+          "within_scaled_tolerance": true
+        },
+        "I": {
+          "points": 1323,
+          "rmse": 5.316265915831317e-06,
+          "max_abs": 8.136333880970348e-06,
+          "within_scaled_tolerance": true
+        },
+        "Xe": {
+          "points": 1323,
+          "rmse": 1.2587451427539938e-05,
+          "max_abs": 1.6740238492740644e-05,
+          "within_scaled_tolerance": true
+        },
+        "rho": {
+          "points": 1323,
+          "rmse": 3.894975676033969e-07,
+          "max_abs": 8.275807838326044e-07,
+          "within_scaled_tolerance": true
+        },
+        "P_decay": {
+          "points": 1323,
+          "rmse": 2.8640000654682053e-07,
+          "max_abs": 5.000375957768186e-07,
+          "within_scaled_tolerance": true
+        },
+        "rod_position": {
+          "points": 1323,
+          "rmse": 8.999571072180305e-09,
+          "max_abs": 2.3209994759465502e-07,
+          "within_scaled_tolerance": true
+        }
+      },
+      "all_variables_within_scaled_tolerance": true
+    }
+  ],
+  "parity_summary": [
+    {
+      "report": "preset_0_parity",
+      "pass": true,
+      "points": 50,
+      "worst_rmse": 5.96000000463448e-08,
+      "worst_max_abs": 5.96000000463448e-08
+    },
+    {
+      "report": "preset_1_parity",
+      "pass": true,
+      "points": 50,
+      "worst_rmse": 4.154999999617104e-07,
+      "worst_max_abs": 5.885117388970684e-07
+    },
+    {
+      "report": "preset_2_parity",
+      "pass": true,
+      "points": 50,
+      "worst_rmse": 8.590192101779053e-07,
+      "worst_max_abs": 2.4963768510133377e-06
+    },
+    {
+      "report": "rod_insertion_parity",
+      "pass": true,
+      "points": 1800,
+      "worst_rmse": 9.521341531726376e-06,
+      "worst_max_abs": 6.246952136734762e-05
+    },
+    {
+      "report": "rod_withdrawal_parity",
+      "pass": true,
+      "points": 1800,
+      "worst_rmse": 4.69731657848477e-05,
+      "worst_max_abs": 0.00012331075947713543
+    },
+    {
+      "report": "xenon_36h_parity",
+      "pass": true,
+      "points": 1323,
+      "worst_rmse": 1.2587451427539938e-05,
+      "worst_max_abs": 1.6740238492740644e-05
+    }
+  ]
+}

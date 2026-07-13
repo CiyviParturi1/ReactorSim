@@ -1,0 +1,23 @@
+{
+  "started_utc": "2026-07-13T11:39:47.234074+00:00",
+  "port": "COM7",
+  "baud": 115200,
+  "test_name": "m2_1000_frames",
+  "data_start_seen": 0,
+  "malformed_rows": 0,
+  "wrong_field_counts": 0,
+  "non_finite_values": 0,
+  "serial_disconnects": 0,
+  "pre_sync_discarded_lines": 1,
+  "schedule": [
+    {
+      "at_wall_s": 0.0,
+      "command": "M2",
+      "label": "select measured xenon mode"
+    }
+  ],
+  "finished_utc": "2026-07-13T11:41:32.305537+00:00",
+  "elapsed_wall_s": 105.07800000000134,
+  "last_sim_time_s": 106170.703125,
+  "unexecuted_schedule_events": []
+}

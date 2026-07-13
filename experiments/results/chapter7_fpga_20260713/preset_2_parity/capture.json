@@ -1,0 +1,28 @@
+{
+  "started_utc": "2026-07-13T12:22:50.123465+00:00",
+  "port": "COM7",
+  "baud": 115200,
+  "test_name": "preset_2_parity",
+  "data_start_seen": 0,
+  "malformed_rows": 0,
+  "wrong_field_counts": 0,
+  "non_finite_values": 0,
+  "serial_disconnects": 0,
+  "pre_sync_discarded_lines": 1,
+  "schedule": [
+    {
+      "at_sim_time_s": 0.0,
+      "command": "C2",
+      "label": "cooling-loss preset parity reset"
+    },
+    {
+      "at_sim_time_s": 0.2,
+      "command": "M0",
+      "label": "realtime mode"
+    }
+  ],
+  "finished_utc": "2026-07-13T12:22:56.177590+00:00",
+  "elapsed_wall_s": 6.061999999999898,
+  "last_sim_time_s": 5.9,
+  "unexecuted_schedule_events": []
+}

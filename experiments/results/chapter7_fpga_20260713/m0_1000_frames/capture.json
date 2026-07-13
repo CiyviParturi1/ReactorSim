@@ -1,0 +1,23 @@
+{
+  "started_utc": "2026-07-13T11:36:01.123104+00:00",
+  "port": "COM7",
+  "baud": 115200,
+  "test_name": "m0_1000_frames",
+  "data_start_seen": 0,
+  "malformed_rows": 0,
+  "wrong_field_counts": 0,
+  "non_finite_values": 0,
+  "serial_disconnects": 0,
+  "pre_sync_discarded_lines": 1,
+  "schedule": [
+    {
+      "at_wall_s": 0.0,
+      "command": "M0",
+      "label": "select measured realtime baseline"
+    }
+  ],
+  "finished_utc": "2026-07-13T11:37:46.162219+00:00",
+  "elapsed_wall_s": 105.04699999999866,
+  "last_sim_time_s": 145.0,
+  "unexecuted_schedule_events": []
+}
