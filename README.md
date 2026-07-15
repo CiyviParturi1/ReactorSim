@@ -57,6 +57,22 @@ reset and preset commands restart simulated time and are recorded as such in
 the acceptance matrix. The [hardware xenon graph](experiments/results/chapter7_fpga_20260713/figures/hardware_xenon.png)
 and individual parity reports are included with the results.
 
+## Accident-character demonstrations
+
+The reproducible PC presentation campaign includes simplified Chernobyl-style
+and TMI-style scenarios, each compared with the modern PWR-SMR-like preset.
+The scenarios reproduce the intended timing and qualitative response; they are
+not scientific accident reconstructions or safety analyses.
+
+- [Campaign report](experiments/results/accident_pc_20260715/summary.md)
+- [Chernobyl-style comparison graph](experiments/results/accident_pc_20260715/figures/chernobyl_comparison.png)
+- [TMI-style comparison graph](experiments/results/accident_pc_20260715/figures/tmi_comparison.png)
+
+Run `experiments/run_accident_campaign.ps1` to rebuild the raw traces, validate
+the schedules, regenerate both graphs, run the native regression suites, and
+write metadata plus SHA-256 checksums. Equivalent FPGA schedules are planned
+after the accident-stage controls are exposed through the shared HLS/AXI path.
+
 ## Repository layout
 
 - [`docs/architecture.md`](docs/architecture.md) — runtime, FPGA, build, and

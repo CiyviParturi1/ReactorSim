@@ -1,0 +1,40 @@
+{
+  "chernobyl_style": {
+    "duration_s": 120.0,
+    "frame_s": 0.1,
+    "initial_power": 0.0625,
+    "initial_iodine_ratio": 1.0,
+    "initial_xenon_ratio": 1.25,
+    "requested_rod_reactivity": 0.0025,
+    "events_s": {
+      "rod_withdrawal": 20.0,
+      "AZ5": 56.0,
+      "RBMK_shutdown_effect": 62.0
+    },
+    "presets": {
+      "accident": 1,
+      "modern_comparison": 0
+    }
+  },
+  "tmi_style": {
+    "duration_s": 14400.0,
+    "frame_s": 1.0,
+    "initial_power": 1.0,
+    "events_s": {
+      "feedwater_loss": 0.0,
+      "reactor_trip": 12.0,
+      "pump_reduction": 600.0,
+      "core_uncovery_surrogate": 6300.0,
+      "cooling_restored": 8280.0
+    },
+    "surrogate_parameters": {
+      "degraded_gamma": 0.01,
+      "uncovered_gamma": 0.00025,
+      "uncovered_K_heat": 25.0
+    },
+    "presets": {
+      "accident": 2,
+      "modern_comparison": 0
+    }
+  }
+}

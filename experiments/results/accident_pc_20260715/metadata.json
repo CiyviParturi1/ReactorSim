@@ -1,0 +1,28 @@
+﻿{
+    "generated_utc":  "2026-07-15T09:11:03.5913760Z",
+    "generated_local":  "2026-07-15T13:11:03.5943942+04:00",
+    "campaign":  "PC accident-character presentation surrogates",
+    "source_base_commit":  "8fdc6a49de13b3cfdb61cf5c76cd93ba347c5c33",
+    "source_branch":  "main",
+    "working_tree_dirty":  true,
+    "working_tree_status_before_campaign":  " M .gitignore\n M README.md\n M experiments/README.md\n?? experiments/analyse_accident_scenarios.py\n?? experiments/results/accident_pc_20260715/\n?? experiments/run_accident_campaign.ps1\n?? experiments/run_accident_scenarios.cpp",
+    "source_file_sha256":  {
+                               "common/point_kinetics_config.h":  "5f9e70819863fc7dd3aa602f884eb9d403afd5c61d7288549df28cb06f5b02cf",
+                               "common/point_kinetics_core.h":  "91da3ac5225e2b4d6342b0dabbc90f65da17f96fca40c931f4eff668e302d5e1",
+                               "experiments/run_accident_scenarios.cpp":  "f7cfdb745fb08a51c13ce15e5be5ac8a90372d79c4357a72a0e500c556b4d97f",
+                               "experiments/analyse_accident_scenarios.py":  "5c44782b47c8236a1766c5bd83becb6a254b68ef827273fb0a4fc8aa8c306450",
+                               "experiments/run_accident_campaign.ps1":  "9f0cc06588df513824766e04f9227bc2a07fa2ff84692fe4e99d215e2e5eba0a"
+                           },
+    "compiler":  {
+                     "executable":  "g++",
+                     "version":  "g++.exe (x86_64-posix-seh-rev0, Built by MinGW-Builds project) 13.2.0",
+                     "flags":  "-std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror"
+                 },
+    "python":  "Python 3.12.3",
+    "host":  {
+                 "computer_name":  "PARTURI",
+                 "operating_system":  "Microsoft Windows NT 10.0.26200.0",
+                 "processor":  "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel"
+             },
+    "interpretation":  "Presentation-level qualitative scenarios; not scientific accident reconstruction or safety analysis."
+}

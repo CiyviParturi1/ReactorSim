@@ -102,6 +102,7 @@ Makefile
 *.fst
 *.wcfg
 *.csv
+!experiments/results/accident_pc_*/*.csv
 
 # Tool-created nested metadata that is redundant with this root ignore file
 hls/**/.gitignore

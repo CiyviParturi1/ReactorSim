@@ -1,0 +1,209 @@
+{
+  "campaign": "PC accident-character surrogate tests",
+  "scope": "Educational lumped point-kinetics and two-node thermal model; not an accident-analysis code.",
+  "scenario_definition": {
+    "chernobyl_style": {
+      "duration_s": 120.0,
+      "frame_s": 0.1,
+      "initial_power": 0.0625,
+      "initial_iodine_ratio": 1.0,
+      "initial_xenon_ratio": 1.25,
+      "requested_rod_reactivity": 0.0025,
+      "events_s": {
+        "rod_withdrawal": 20.0,
+        "AZ5": 56.0,
+        "RBMK_shutdown_effect": 62.0
+      },
+      "presets": {
+        "accident": 1,
+        "modern_comparison": 0
+      }
+    },
+    "tmi_style": {
+      "duration_s": 14400.0,
+      "frame_s": 1.0,
+      "initial_power": 1.0,
+      "events_s": {
+        "feedwater_loss": 0.0,
+        "reactor_trip": 12.0,
+        "pump_reduction": 600.0,
+        "core_uncovery_surrogate": 6300.0,
+        "cooling_restored": 8280.0
+      },
+      "surrogate_parameters": {
+        "degraded_gamma": 0.01,
+        "uncovered_gamma": 0.00025,
+        "uncovered_K_heat": 25.0
+      },
+      "presets": {
+        "accident": 2,
+        "modern_comparison": 0
+      }
+    }
+  },
+  "metrics": {
+    "chernobyl_rbmk_like": {
+      "rows": 1204,
+      "initial_n": 0.0625,
+      "peak_n": {
+        "value": 2.155487537,
+        "time_s": 62.0
+      },
+      "peak_factor_from_initial": 34.487800592,
+      "peak_fuel_temperature_C": {
+        "value": 497.2579956,
+        "time_s": 62.0
+      },
+      "peak_coolant_temperature_C": {
+        "value": 293.8519287,
+        "time_s": 65.29999542
+      },
+      "peak_positive_reactivity": {
+        "value": 0.002490280196,
+        "time_s": 22.0
+      },
+      "final": {
+        "time_s": 120.0,
+        "n": 0.001234148978,
+        "Tf_C": 300.4515076,
+        "Tc_C": 270.5030823,
+        "decay_heat": 0.004403914325
+      },
+      "all_finite": true,
+      "numerical_faults": 0
+    },
+    "chernobyl_modern_pwr": {
+      "rows": 1203,
+      "initial_n": 0.0625,
+      "peak_n": {
+        "value": 0.2424745262,
+        "time_s": 56.0
+      },
+      "peak_factor_from_initial": 3.8795924192,
+      "peak_fuel_temperature_C": {
+        "value": 304.8545227,
+        "time_s": 56.0
+      },
+      "peak_coolant_temperature_C": {
+        "value": 268.8430176,
+        "time_s": 57.39999771
+      },
+      "peak_positive_reactivity": {
+        "value": 0.001627938356,
+        "time_s": 26.19999886
+      },
+      "final": {
+        "time_s": 120.0,
+        "n": 0.0004018294567,
+        "Tf_C": 270.0873718,
+        "Tc_C": 265.5544739,
+        "decay_heat": 0.002602246124
+      },
+      "all_finite": true,
+      "numerical_faults": 0
+    },
+    "tmi_loss_of_cooling": {
+      "rows": 14405,
+      "initial_n": 1.0,
+      "peak_n": {
+        "value": 1.0,
+        "time_s": 0.0
+      },
+      "peak_factor_from_initial": 1.0,
+      "peak_fuel_temperature_C": {
+        "value": 836.3728638,
+        "time_s": 8280.0
+      },
+      "peak_coolant_temperature_C": {
+        "value": 408.0556335,
+        "time_s": 31.00000191
+      },
+      "peak_positive_reactivity": {
+        "value": 0.0,
+        "time_s": 0.0
+      },
+      "final": {
+        "time_s": 14400.00098,
+        "n": 0.0,
+        "Tf_C": 267.8633728,
+        "Tc_C": 265.2884216,
+        "decay_heat": 0.0102865519
+      },
+      "all_finite": true,
+      "numerical_faults": 0
+    },
+    "tmi_modern_pwr": {
+      "rows": 14405,
+      "initial_n": 1.0,
+      "peak_n": {
+        "value": 1.0,
+        "time_s": 0.0
+      },
+      "peak_factor_from_initial": 1.0,
+      "peak_fuel_temperature_C": {
+        "value": 543.0,
+        "time_s": 0.0
+      },
+      "peak_coolant_temperature_C": {
+        "value": 293.0,
+        "time_s": 0.0
+      },
+      "peak_positive_reactivity": {
+        "value": 0.0,
+        "time_s": 0.0
+      },
+      "final": {
+        "time_s": 14400.00098,
+        "n": 0.0,
+        "Tf_C": 267.8635864,
+        "Tc_C": 265.2884521,
+        "decay_heat": 0.01028728206
+      },
+      "all_finite": true,
+      "numerical_faults": 0
+    }
+  },
+  "accuracy": {
+    "chernobyl": {
+      "historical_reference": "https://pub.iaea.org/MTCD/publications/PDF/Pub913e_web.pdf",
+      "test_to_AZ5_s": 36.0,
+      "AZ5_to_surrogate_shutdown_insertion_s": 6.0,
+      "rbmk_peak_time_after_AZ5_s": 6.0,
+      "timing_character_match": true,
+      "magnitude_validated": false,
+      "assessment": "Timing is imposed from the historical sequence and the positive-feedback preset produces a rapid rise. The lumped model cannot validate accident magnitude because it has no void fraction, graphite-displacer effect, spatial kinetics, pressure, or structural failure."
+    },
+    "tmi": {
+      "historical_references": [
+        "https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/3mile-isle",
+        "https://www.nrc.gov/reading-rm/doc-collections/gen-comm/bulletins/1979/bl79005a"
+      ],
+      "reactor_trip_s": 12.00000095,
+      "NRC_trip_window_s": [
+        9.0,
+        12.0
+      ],
+      "trip_timing_match": true,
+      "scheduled_core_uncovery_s": 6300.000488,
+      "scheduled_peak_fuel_temperature_s": 8280.0,
+      "scheduled_heatup_timing_match": true,
+      "assessment": "The prompt trip, staged cooling degradation, delayed core-uncovery heat-up and recovery after relief-valve isolation are represented as a presentation surrogate. The event timing is imposed; coolant inventory and pressure are not solved."
+    }
+  },
+  "checks": {
+    "expected_trace_lengths": true,
+    "time_is_nondecreasing": true,
+    "scenario_names_are_consistent": true,
+    "expected_events_occur_once": true,
+    "scheduled_event_times_match": true,
+    "all_traces_finite": true,
+    "zero_numerical_faults": true,
+    "rbmk_peak_exceeds_10x_initial": true,
+    "rbmk_peak_exceeds_modern": true,
+    "modern_scram_collapses_power_within_1s": true,
+    "tmi_like_delayed_fuel_peak_exceeds_modern_by_200C": true,
+    "tmi_trip_timing_matches_NRC_window": true,
+    "tmi_delayed_heatup_occurs_in_scheduled_window": true,
+    "tmi_cooling_restoration_returns_below_300C": true
+  }
+}

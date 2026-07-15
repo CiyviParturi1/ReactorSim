@@ -51,6 +51,35 @@ UART reliability, GUI hardware operation, RTL co-simulation, and PC-FPGA parity.
 PC/core-HLS parity is still covered by the existing native test, but it is
 implementation consistency rather than independent physical validation.
 
+## Accident-character presentation campaign
+
+The deterministic presentation campaign compares the RBMK-like and
+loss-of-cooling presets with the modern PWR-SMR-like preset. Run it from the
+repository root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\experiments\run_accident_campaign.ps1
+```
+
+To reproduce a named result directory:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\experiments\run_accident_campaign.ps1 `
+  -ResultsDirectory experiments\results\accident_pc_YYYYMMDD
+```
+
+The campaign generates four raw CSV traces, a machine-readable scenario
+definition, metadata, automated consistency checks, SHA-256 checksums, a
+Markdown/JSON summary, and Chernobyl-style and TMI-style comparison graphs.
+All checks must pass or the campaign exits with an error.
+
+These are deliberately qualitative presentation surrogates. The Chernobyl
+schedule imposes its AZ-5/shutdown-effect timing. The TMI schedule represents
+coolant loss and core uncovery by staged heat-transfer parameters because the
+shared model does not solve pressure, coolant inventory, boiling, or core level.
+
 The three-preset section is titled `სამი რეაქტორული წინასწარი კონფიგურაციის
 პასუხი ერთნაირ რეაქტიულობის ზემოქმედებაზე`. Its comparison includes both the
 feedback-coefficient differences and the different active cooling-removal
