@@ -1,8 +1,9 @@
 # FPGA Point-Kinetics Reactor Simulator
 
-> **Development status:** Release candidate. The PC and FPGA implementations
-> share one physics core and pass the documented native, HLS, Vivado, and Vitis
-> build checks. Final ZedBoard hardware acceptance testing is still required.
+> **Development status:** Hardware-validated release candidate. The PC and FPGA
+> implementations share one physics core and pass the documented native, HLS,
+> Vivado, Vitis, and recorded physical-ZedBoard checks. Manual GUI/GPIO and
+> extended endurance evidence remain useful release work.
 
 This repository contains a point-kinetics reactor simulation targeting a
 ZedBoard (`xc7z020clg484-1`). The simulation core is implemented as Vitis HLS
@@ -32,6 +33,29 @@ qualification tool, or a substitute for validated neutronics and
 thermal-hydraulics software. Numerical agreement between PC, HLS, and FPGA
 builds demonstrates implementation consistency; it does not validate the
 model against a particular reactor.
+
+## Validated ZedBoard results
+
+The physical campaign was run on a 100 MHz ZedBoard design using COM7 at
+115200 baud. The committed [Chapter 7 evidence summary](experiments/results/chapter7_fpga_20260713/summary.md)
+is derived from the preserved raw UART logs and records the tested source,
+bitstream, XSA, ELF, tool versions, and SHA-256 artifact identities.
+
+| Physical result | Measured outcome |
+| --- | --- |
+| M0 timing | 1,051 frames; ARM-reported 1.00086x and host-observed 1.00647x; no missed frames |
+| M1 timing | 1,051 frames; steady ARM-reported 10.0086x |
+| M2 timing | 1,050 frames; steady ARM-reported 1000.305x; one recorded 100 ms-frame miss |
+| Reset and safety | Stable 0.1, 0.5, 1.0, and 1.5 power resets; UART command, SCRAM latch, clear-SCRAM, and three preset tests passed |
+| Rod transients | Withdrawal and insertion were recorded through 180 simulated seconds with finite, valid engine state |
+| Iodine-xenon transient | 36.03 simulated hours after SCRAM; Xe peak 1.503229 at 7.38914 h and peak worth -1.437857 dollars |
+| PC-FPGA parity | Six reports pass the established scaled tolerance: three presets, rod withdrawal, rod insertion, and the 36-hour xenon case |
+
+The campaign observed no malformed rows, non-finite values, engine-state
+failures, or serial disconnects in the retained automated captures. Intentional
+reset and preset commands restart simulated time and are recorded as such in
+the acceptance matrix. The [hardware xenon graph](experiments/results/chapter7_fpga_20260713/figures/hardware_xenon.png)
+and individual parity reports are included with the results.
 
 ## Repository layout
 
@@ -359,23 +383,16 @@ fraction, cladding temperature, core uncovering, chemistry, protection-system
 logic, or plant-specific control-bank worth. Results outside the tested
 training envelope must be treated as invalid rather than as plant predictions.
 
-## Remaining release work
+## Remaining validation and release work
 
-The mathematical scope is sufficient to describe the project as a simplified
-reactor simulator for basic control research and student training. Before
-calling the complete PC/FPGA product finished:
+The automated physical acceptance campaign is complete. Before describing the
+complete PC/FPGA product as operationally polished, retain or add:
 
-1. Make every numerical-fault path immediately enter the same latched SCRAM
-   state and add regression coverage for non-finite power and temperatures.
-2. Make ARM CSV formatting safe for non-finite and out-of-range values.
-3. Run a ZedBoard acceptance test covering reset powers, all three plant
-   presets, rod commands, SCRAM/clear behavior, UART framing, and a sustained
-   accelerated xenon run. Record measured compression rather than assuming
-   the requested 1000x rate.
-4. Record the source and rationale for each educational parameter set and
-   define expected qualitative outcomes for the training scenarios.
-5. Commit and tag the reviewed source, regenerated Vivado metadata, tests, and
-   documentation together.
+1. manual GPIO switch evidence for SW0, SW1, and SW7;
+2. GUI-button equivalence screenshots and a 30-60 minute GUI/UART endurance
+   run; and
+3. documented provenance and intended qualitative outcomes for each
+   educational parameter set.
 
 A fully coupled analytical iodine-xenon update and calibration against a
 specific reactor are optional future fidelity improvements. They are not
@@ -385,6 +402,8 @@ claims would require both.
 ## Version-control policy
 
 Commit source code, tests, constraints, block-design files, IP configuration,
-project/component metadata, and reconstruction scripts. Do not commit generated
-HLS output, Vivado runs, checkpoints, bitstreams, hardware exports, Vitis build
-directories, logs, or local IDE state.
+project/component metadata, reconstruction scripts, and compact reproducible
+physical-test evidence (raw UART logs, metadata, validation summaries, parity
+reports, and figures). Do not commit generated HLS output, Vivado runs,
+checkpoints, bitstreams, hardware exports, Vitis build directories, local IDE
+state, or regenerable derived CSV traces.
