@@ -434,7 +434,7 @@ def make_xenon_plot(telemetry: Path, output: Path) -> bool:
         import matplotlib.pyplot as plt
     except ImportError:
         return False
-    rows = csv_rows(telemetry)
+    rows = latest_continuous_epoch(csv_rows(telemetry))
     scram_rows = [row for row in rows if row.get("scram_active", 0.0) >= 0.5]
     if not scram_rows:
         return False
@@ -444,6 +444,15 @@ def make_xenon_plot(telemetry: Path, output: Path) -> bool:
     time_h = [(row["sim_time_s"] - scram_time) / 3600.0 for row in rows]
     axis.plot(time_h, [row["I_norm"] for row in rows], label="I norm")
     axis.plot(time_h, [row["Xe_norm"] for row in rows], label="Xe norm")
+    peak = max(rows, key=lambda row: row["Xe_norm"])
+    peak_h = (peak["sim_time_s"] - scram_time) / 3600.0
+    axis.axvline(peak_h, color="#555555", linestyle="--", linewidth=1, label=f"Xe peak ({peak_h:.2f} h)")
+    axis.scatter([peak_h], [peak["Xe_norm"]], color="#b22222", zorder=4)
+    axis.annotate(
+        f"Xe peak {peak['Xe_norm']:.3f}", xy=(peak_h, peak["Xe_norm"]),
+        xytext=(peak_h + 1.2, peak["Xe_norm"] - 0.12),
+        arrowprops={"arrowstyle": "->", "color": "#555555"}, fontsize=9,
+    )
     axis.set_title("Physical FPGA iodine-xenon transient after SCRAM")
     axis.set_xlabel("time after SCRAM (h)")
     axis.grid(True, alpha=0.3)

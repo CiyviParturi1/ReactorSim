@@ -11,6 +11,13 @@ import statistics
 from pathlib import Path
 
 
+PRESET_NAMES = {
+    0: "PWR-SMR",
+    1: "RBMK-like",
+    2: "Cooling-loss",
+}
+
+
 def read_csv(path: Path) -> list[dict[str, float | str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         rows = []
@@ -185,52 +192,74 @@ def make_plots(input_dir: Path, figures_dir: Path) -> None:
         return
     figures_dir.mkdir(parents=True, exist_ok=True)
 
-    def plot_file(filename: str, x: str, series: list[tuple[str, str]], title: str, output: str, log_y: bool = False) -> None:
-        rows = read_csv(input_dir / filename)
-        figure, axis = plt.subplots(figsize=(10, 5.5))
-        for label, key in series:
-            axis.plot([number(row, x) for row in rows], [number(row, key) for row in rows], label=label)
-        axis.set_title(title)
-        axis.set_xlabel(x)
-        axis.grid(True, alpha=0.3)
-        if log_y:
-            axis.set_yscale("log")
-        axis.legend()
+    def save(figure, output: str) -> None:
         figure.tight_layout()
-        figure.savefig(figures_dir / output, dpi=160)
+        figure.savefig(figures_dir / output, dpi=180)
         plt.close(figure)
 
-    plot_file("rod_withdrawal.csv", "sim_time_s", [("N", "n"), ("rod position", "rod_position"), ("rho ($)", "rho_dollars")], "Control-rod withdrawal", "rod_withdrawal.png")
-    plot_file("rod_insertion.csv", "sim_time_s", [("N", "n"), ("rod position", "rod_position"), ("rho ($)", "rho_dollars")], "Control-rod insertion", "rod_insertion.png")
-    plot_file("scram_fast.csv", "sim_time_s", [("N", "n"), ("thermal power", "thermal_power"), ("decay heat", "decay_heat")], "Fast SCRAM response", "scram_fast.png", log_y=True)
+    def plot_rod(filename: str, title: str, output: str) -> None:
+        rows = read_csv(input_dir / filename)
+        time_s = [number(row, "sim_time_s") for row in rows]
+        figure, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+        series = (("Normalized neutron power", "n"), ("Rod position (fraction)", "rod_position"), ("Reactivity ($)", "rho_dollars"))
+        for axis, (label, key) in zip(axes, series):
+            axis.plot(time_s, [number(row, key) for row in rows], color="#1769aa", linewidth=1.6, label=label)
+            axis.set_ylabel(label)
+            axis.grid(True, alpha=0.3)
+            axis.legend(loc="best")
+        axes[-1].set_xlabel("Simulation time (s)")
+        figure.suptitle(title)
+        save(figure, output)
+
+    plot_rod("rod_withdrawal.csv", "Control-rod withdrawal", "rod_withdrawal.png")
+    plot_rod("rod_insertion.csv", "Control-rod insertion", "rod_insertion.png")
+
+    scram_rows = read_csv(input_dir / "scram_fast.csv")
+    scram_time = [number(row, "sim_time_s") for row in scram_rows]
+    figure, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+    for axis, label, key in zip(axes, ("Normalized neutron power", "Decay heat", "Total thermal power"), ("n", "decay_heat", "thermal_power")):
+        axis.plot(scram_time, [number(row, key) for row in scram_rows], color="#b22222" if key == "n" else "#1769aa", linewidth=1.6, label=label)
+        axis.set_ylabel(label)
+        axis.set_yscale("log")
+        axis.grid(True, alpha=0.3)
+        axis.legend(loc="best")
+    axes[-1].set_xlabel("Simulation time (s)")
+    figure.suptitle("Fast SCRAM response")
+    save(figure, "scram_fast.png")
+
     xenon_rows = read_csv(input_dir / "xenon_36h.csv")
     figure, axis = plt.subplots(figsize=(10, 5.5))
     time_h = [(number(row, "sim_time_s") - 10.0) / 3600.0 for row in xenon_rows]
     axis.plot(time_h, [number(row, "I_norm") for row in xenon_rows], label="I norm")
     axis.plot(time_h, [number(row, "Xe_norm") for row in xenon_rows], label="Xe norm")
+    peak = max(xenon_rows, key=lambda row: number(row, "Xe_norm"))
+    peak_h = (number(peak, "sim_time_s") - 10.0) / 3600.0
+    peak_xe = number(peak, "Xe_norm")
+    axis.axvline(peak_h, color="#555555", linestyle="--", linewidth=1, label=f"Xe peak ({peak_h:.2f} h)")
+    axis.scatter([peak_h], [peak_xe], color="#b22222", zorder=4)
+    axis.annotate(f"Xe peak {peak_xe:.3f}", xy=(peak_h, peak_xe), xytext=(peak_h + 1.2, peak_xe - 0.12), arrowprops={"arrowstyle": "->", "color": "#555555"}, fontsize=9)
     axis.set_title("36-hour iodine-xenon transient after SCRAM")
     axis.set_xlabel("time after SCRAM (h)")
     axis.grid(True, alpha=0.3)
     axis.legend()
-    figure.tight_layout()
-    figure.savefig(figures_dir / "xenon_36h.png", dpi=160)
-    plt.close(figure)
+    save(figure, "xenon_36h.png")
 
     figure, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
     for mode in range(3):
         rows = read_csv(input_dir / f"preset_{mode}.csv")
-        axes[0].plot([number(row, "sim_time_s") for row in rows], [number(row, "n") for row in rows], label=f"preset {mode}")
-        axes[1].plot([number(row, "sim_time_s") for row in rows], [number(row, "Tf") for row in rows], label=f"preset {mode}")
-        axes[2].plot([number(row, "sim_time_s") for row in rows], [number(row, "Tc") for row in rows], label=f"preset {mode}")
-    for axis, label in zip(axes, ("N", "Tf", "Tc")):
+        label = PRESET_NAMES[mode]
+        axes[0].plot([number(row, "sim_time_s") for row in rows], [number(row, "n") for row in rows], label=label)
+        axes[1].plot([number(row, "sim_time_s") for row in rows], [number(row, "Tf") for row in rows], label=label)
+        axes[2].plot([number(row, "sim_time_s") for row in rows], [number(row, "Tc") for row in rows], label=label)
+    for axis, label in zip(axes, ("Normalized neutron power", "Fuel temperature (°C)", "Coolant temperature (°C)")):
         axis.set_ylabel(label)
         axis.grid(True, alpha=0.3)
-        axis.legend()
-    axes[-1].set_xlabel("sim_time_s")
-    figure.suptitle("Identical reactivity insertion across presets")
-    figure.tight_layout()
-    figure.savefig(figures_dir / "preset_comparison.png", dpi=160)
-    plt.close(figure)
+    handles, labels = axes[0].get_legend_handles_labels()
+    figure.legend(handles, labels, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 0.97))
+    axes[-1].set_xlabel("Simulation time (s)")
+    figure.suptitle("Response to identical reactivity commands across plant presets")
+    figure.subplots_adjust(top=0.88)
+    save(figure, "preset_comparison.png")
 
     rows = read_csv(input_dir / "rk4_convergence.csv")
     figure, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
@@ -245,9 +274,82 @@ def make_plots(input_dir: Path, figures_dir: Path) -> None:
         axis.legend()
     axes[-1].set_xlabel("sim_time_s")
     figure.suptitle("Semi-implicit solver error versus RK4 reference")
-    figure.tight_layout()
-    figure.savefig(figures_dir / "rk4_error.png", dpi=160)
-    plt.close(figure)
+    save(figure, "rk4_error.png")
+
+    performance = performance_summary(input_dir / "performance_frames.csv")
+    mode_labels = ["REALTIME", "TRAINING", "XENON"]
+    figure, axis = plt.subplots(figsize=(10, 5.8))
+    x = list(range(len(mode_labels)))
+    width = 0.24
+    metrics = (("Mean", "mean_frame_time_s", "#1769aa"), ("p95", "p95_frame_time_s", "#d2691e"), ("Maximum", "max_frame_time_s", "#b22222"))
+    for offset, (label, key, color) in enumerate(metrics):
+        values_ms = [float(row[key]) * 1000.0 for row in performance]
+        bars = axis.bar([value + (offset - 1) * width for value in x], values_ms, width, label=label, color=color)
+        for bar, value in zip(bars, values_ms):
+            axis.annotate(f"{value:.3g}", (bar.get_x() + bar.get_width() / 2.0, value), xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=8, rotation=90)
+    axis.axhline(100.0, color="#555555", linestyle="--", linewidth=1.2, label="100 ms frame deadline")
+    axis.set_yscale("log")
+    axis.set_xticks(x, mode_labels)
+    axis.set_ylabel("Frame-computation time (ms, log scale)")
+    axis.set_title("PC frame-computation performance")
+    axis.grid(True, axis="y", alpha=0.3)
+    axis.legend(ncol=2)
+    save(figure, "pc_performance.png")
+
+    long_rows = read_csv(input_dir / "scram_long.csv")
+    long_rows = [row for row in long_rows if number(row, "sim_time_s") >= 10.0]
+    time_after = [number(row, "sim_time_s") - 10.0 for row in long_rows]
+    figure, axes = plt.subplots(2, 1, figsize=(10, 7.2), sharex=True, gridspec_kw={"height_ratios": (1.4, 0.8)})
+    axes[0].plot(time_after, [max(number(row, "n"), 1.0e-45) for row in long_rows], label="Neutron power", color="#b22222", linewidth=1.7)
+    axes[0].plot(time_after, [max(number(row, "thermal_power"), 1.0e-45) for row in long_rows], label="Total thermal power", color="#1769aa", linewidth=1.5, linestyle="--")
+    axes[0].plot(time_after, [max(number(row, "decay_heat"), 1.0e-45) for row in long_rows], label="Decay heat", color="#d2691e", linewidth=2.0)
+    decay_fraction = [
+        number(row, "decay_heat") / max(number(row, "thermal_power"), 1.0e-45)
+        for row in long_rows
+    ]
+    axes[1].plot(time_after, decay_fraction, color="#d2691e", linewidth=2.0)
+    axes[1].axhline(1.0, color="#555555", linestyle=":", linewidth=1.0)
+    for mark, label in ((60.0, "60 s"), (600.0, "600 s"), (3600.0, "1 h"), (7200.0, "2 h")):
+        for axis in axes:
+            axis.axvline(mark, color="#777777", linestyle=":" if mark not in (3600.0, 7200.0) else "--", linewidth=0.8)
+        axes[0].text(mark, 0.98, label, transform=axes[0].get_xaxis_transform(), ha="right", va="top", fontsize=8, rotation=90)
+    axes[0].set_yscale("log")
+    axes[0].set_ylabel("Normalized power (log scale)")
+    axes[0].set_title("Power components after SCRAM")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+    axes[1].set_xscale("symlog", linthresh=60.0)
+    axes[1].set_xticks((0.0, 10.0, 60.0, 600.0, 3600.0, 7200.0), ("0", "10", "60", "600", "3600", "7200"))
+    axes[1].set_ylim(0.0, 1.05)
+    axes[1].set_xlabel("Time after SCRAM (s; symmetric-log scale)")
+    axes[1].set_ylabel("Decay heat / total\nthermal power")
+    axes[1].set_title("Decay heat becomes the total thermal-power source")
+    axes[1].grid(True, alpha=0.3)
+    figure.suptitle("Two-hour SCRAM response and decay heat")
+    save(figure, "scram_decay_heat_2h.png")
+
+    steady = [physical_summary(path) for path in sorted(input_dir.glob("steady_power_*.csv"))]
+    figure, axis = plt.subplots(figsize=(9, 5.2))
+    powers = [float(row["initial_power"]) for row in steady]
+    drifts = [float(row["max_power_drift_fraction"]) for row in steady]
+    display_floor = 1.0e-12
+    display = [max(value, display_floor) for value in drifts]
+    markers = ["o" if value > 0.0 else "v" for value in drifts]
+    for index, (value, marker) in enumerate(zip(display, markers)):
+        axis.vlines(index, display_floor, value, color="#1769aa", linewidth=2)
+        axis.plot(index, value, marker=marker, color="#1769aa", markersize=8)
+        label = f"{drifts[index]:.2e}" if drifts[index] > 0.0 else "0 (float precision)"
+        axis.annotate(label, (index, value), xytext=(0, 7), textcoords="offset points", ha="center", fontsize=9)
+    axis.axhline(1.0e-3, color="#555555", linestyle="--", linewidth=1.1, label="project drift tolerance (10⁻³)")
+    axis.set_yscale("log")
+    axis.set_ylim(5.0e-13, 3.0e-3)
+    axis.set_xticks(range(len(powers)), [f"{power:.2f}" for power in powers])
+    axis.set_xlabel("Initial normalized power")
+    axis.set_ylabel("Maximum relative power drift")
+    axis.set_title("Steady-state power drift")
+    axis.grid(True, axis="y", alpha=0.3)
+    axis.legend(loc="upper right")
+    save(figure, "steady_state_drift.png")
 
 
 def markdown_table(rows: list[dict[str, float | str]], columns: list[str]) -> str:
