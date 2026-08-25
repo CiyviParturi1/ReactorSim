@@ -1,19 +1,176 @@
+#!/usr/bin/env python3
+"""Live dashboard for the point-kinetics reactor simulator.
+
+Reads the 23-field telemetry CSV stream (stdin pipe or UART) and renders
+trend charts, a reactor-core schematic (moderator, fuel rods, control rods,
+and a dense power-scaled fission spark field), a telemetry panel, and a reduced
+set of controls. UI commands are emitted on stderr (stdin mode) or written
+to the serial port (serial mode) using the same one-letter protocol the PC
+solver and ARM application accept.
+"""
+
 import argparse
 import math
 import queue
+import random
 import sys
 import threading
+import time
 from bisect import bisect_left
-from itertools import chain
+
+import numpy as np
+import matplotlib
+
+if "--smoke" in sys.argv:
+    matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+from matplotlib import colors as mcolors
 from matplotlib.animation import FuncAnimation
-from matplotlib.widgets import Button, RadioButtons, TextBox
+from matplotlib.patches import FancyBboxPatch, Rectangle
+from matplotlib.widgets import Button, RadioButtons, Slider, TextBox
 
 
 COMMAND_PREFIX = "PLOTTER_CMD\t"
 DEFAULT_WINDOW_SECONDS = 6 * 3600.0
 INITIAL_X_SECONDS = 30.0
+
+# Matches config PK_DECAY_FRACTION_* (sum 0.066): thermal = 0.934*n + decay.
+PROMPT_FRACTION = 0.934
+
+NAN = float("nan")
+FIELD_NAMES = (
+    "sim_time_s", "n", "Tf", "rho", "rho_dollars", "Tc", "I_norm", "Xe_norm",
+    "rho_xe", "achieved_factor", "rod_position", "rod_target", "engine_status",
+    "target_h_s", "step_real_time_s", "decay_heat", "plant_mode",
+    "rho_rod_dollars", "rho_fuel_dollars", "rho_coolant_dollars",
+    "rho_xenon_dollars", "critical_rod_position", "scram_active",
+)
+FIELD_DEFAULTS = (
+    NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN,
+    NAN, NAN, NAN, NAN, 1.0,
+    NAN, NAN, 0.0, 0.0,
+    NAN, NAN, NAN,
+    NAN, 0.75, 0.0,
+)
+
+PLANT_NAMES = {
+    0: "PWR-SMR Passive Safe",
+    1: "RBMK-like Demonstrator",
+    2: "TMI-inspired Cooling Loss",
+}
+
+WINDOW_PRESETS = (
+    ("30 s", 30.0),
+    ("5 min", 300.0),
+    ("1 h", 3600.0),
+    ("all", None),
+)
+
+# Merge rapid ±1% rod clicks into one marker after this quiet gap (sim seconds).
+ROD_COALESCE_S = 1.5
+ROD_EVENT_MIN_DELTA = 0.008
+
+# ---------------------------------------------------------------------------
+# Theme
+# ---------------------------------------------------------------------------
+
+BG = "#0d1117"
+PANEL = "#151b23"
+PANEL_EDGE = "#2b3543"
+TEXT = "#e6edf3"
+MUTED = "#8b98a8"
+GRID = "#222b37"
+ACCENT = "#4ea1ff"
+
+C_POWER = "#ff6b4a"
+C_THERMAL = "#ffb26b"
+C_FUEL = "#4cc9f0"
+C_COOL = "#57d9a3"
+C_RHO = "#a3e635"
+C_IODINE = "#fbbf24"
+C_XENON = "#c084fc"
+C_TARGET_H = "#e879f9"
+C_STEP = "#22d3ee"
+C_SCRAM = "#da3633"
+C_SCRAM_HOVER = "#f0524f"
+C_SCRAM_DIM = "#5a2528"
+C_CLEAR = "#1f6f4a"
+C_CLEAR_HOVER = "#2ea06b"
+C_CLEAR_ARMED = "#2ea06b"
+C_CLEAR_ARMED_HOVER = "#3ecf85"
+C_CLEAR_DIM = "#1a2e24"
+C_BTN = "#21262d"
+C_BTN_HOVER = "#30363d"
+C_BTN_ACTIVE = "#2d4a6f"
+C_EVENT = {
+    "SCRAM": "#da3633",
+    "clear": "#2ea06b",
+    "rod": "#4ea1ff",
+    "plant": "#fbbf24",
+    "trip": "#ff7b72",
+}
+
+CHART_DEFS = (
+    {"key": "power", "ylabel": "Power", "series": (
+        ("n", "neutron", C_POWER, "-", 1.9),
+        ("thermal", "thermal", C_THERMAL, "--", 1.4),
+    )},
+    {"key": "temp", "ylabel": "Temperature (°C)", "series": (
+        ("Tf", "fuel", C_FUEL, "-", 1.7),
+        ("Tc", "coolant", C_COOL, "-", 1.5),
+    )},
+    {"key": "rho", "ylabel": "Reactivity ($)", "hline": (1.0, "prompt critical"), "series": (
+        ("rho_dollars", "ρ total", C_RHO, "-", 1.7),
+    )},
+    {"key": "poison", "ylabel": "Poison ratio", "series": (
+        ("I_norm", "I-135", C_IODINE, "-", 1.5),
+        ("Xe_norm", "Xe-135", C_XENON, "-", 1.7),
+    )},
+    {"key": "components", "ylabel": "ρ components ($)", "hidden": True, "series": (
+        ("rho_rod_dollars", "rod", "#4ea1ff", "-", 1.4),
+        ("rho_fuel_dollars", "fuel", C_FUEL, "-", 1.4),
+        ("rho_coolant_dollars", "coolant", C_COOL, "-", 1.4),
+        ("rho_xenon_dollars", "xenon", C_XENON, "-", 1.4),
+    )},
+    {"key": "timing", "ylabel": "Step time (s)", "log": True, "hidden": True, "series": (
+        ("target_h_s", "target h", C_TARGET_H, "-", 1.4),
+        ("step_real_time_s", "real / step", C_STEP, "-", 1.4),
+    )},
+)
+# D cycles the bottom optional chart among these three.
+OPTIONAL_CHARTS = ("poison", "components", "timing")
+SERIES_FIELDS = tuple(field for spec in CHART_DEFS for field, *_ in spec["series"])
+
+
+def apply_theme():
+    plt.rcParams.update({
+        "figure.facecolor": BG,
+        "axes.facecolor": PANEL,
+        "axes.edgecolor": PANEL_EDGE,
+        "axes.labelcolor": MUTED,
+        "axes.titlecolor": TEXT,
+        "xtick.color": MUTED,
+        "ytick.color": MUTED,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "axes.labelsize": 9,
+        "grid.color": GRID,
+        "grid.linewidth": 0.8,
+        "text.color": TEXT,
+        "font.family": "sans-serif",
+        "legend.frameon": False,
+    })
+    # Free the keys we use for reactor commands (R=SCRAM, K=clear, P=reset, Space=pause).
+    for keymap, blocked in (
+        ("keymap.home", "r"),
+        ("keymap.xscale", "k"),
+        ("keymap.pan", "p"),
+        ("keymap.fullscreen", "f"),
+        ("keymap.quit", "q"),
+    ):
+        plt.rcParams[keymap] = [k for k in plt.rcParams[keymap] if k.lower() != blocked]
+    plt.rcParams["keymap.quit"] = [k for k in plt.rcParams["keymap.quit"] if k != " "]
 
 
 def log(message):
@@ -22,42 +179,26 @@ def log(message):
 
 def parse_duration(value):
     text = str(value).strip().lower()
-    units = (
-        ("seconds", 1.0),
-        ("second", 1.0),
-        ("secs", 1.0),
-        ("sec", 1.0),
-        ("s", 1.0),
-        ("minutes", 60.0),
-        ("minute", 60.0),
-        ("mins", 60.0),
-        ("min", 60.0),
-        ("m", 60.0),
-        ("hours", 3600.0),
-        ("hour", 3600.0),
-        ("hrs", 3600.0),
-        ("hr", 3600.0),
-        ("h", 3600.0),
-    )
-
     multiplier = 1.0
-    for suffix, unit_multiplier in units:
+    for suffix, unit in (("h", 3600.0), ("hr", 3600.0), ("hours", 3600.0), ("hour", 3600.0),
+                         ("m", 60.0), ("min", 60.0), ("mins", 60.0), ("minutes", 60.0),
+                         ("s", 1.0), ("sec", 1.0), ("secs", 1.0), ("seconds", 1.0)):
         if text.endswith(suffix):
             text = text[: -len(suffix)].strip()
-            multiplier = unit_multiplier
+            multiplier = unit
             break
-
     try:
         duration = float(text) * multiplier
     except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            "duration must be a number, optionally followed by s, m, or h"
-        ) from exc
-
+        raise argparse.ArgumentTypeError("duration must be a number, optionally followed by s, m, or h") from exc
     if duration <= 0:
         raise argparse.ArgumentTypeError("duration must be greater than zero")
     return duration
 
+
+# ---------------------------------------------------------------------------
+# Communication
+# ---------------------------------------------------------------------------
 
 class StdinComm:
     """Reads simulator data from stdin and emits UI commands on stderr."""
@@ -90,7 +231,6 @@ class SerialComm:
             import serial
         except ImportError as exc:
             raise ImportError("pyserial not installed. Run 'pip install pyserial'") from exc
-
         self.ser = serial.Serial(self.port, self.baudrate, timeout=1)
         log(f"[SerialComm] Opened port {self.port} at {self.baudrate} baud")
 
@@ -115,102 +255,1146 @@ class SerialComm:
             log("[SerialComm] Port closed.")
 
 
+class DummyComm:
+    """No-op transport used by the offline smoke render."""
+
+    def open(self):
+        pass
+
+    def read_line(self):
+        return ""
+
+    def write(self, data):
+        pass
+
+    def close(self):
+        pass
+
+
 data_queue = queue.Queue()
 sim_finished = threading.Event()
 
 
-def reader_thread(comm):
-    """Reads data from the selected communication interface."""
-    log("Reader thread started.")
-
-    def value(parts, index, default=None):
-        if len(parts) <= index:
-            return default
-        text = parts[index].strip()
+def parse_telemetry(line):
+    """Parse one CSV telemetry line into a field dict, or None."""
+    parts = line.split(",")
+    if len(parts) < 5:
+        return None
+    row = {}
+    for index, (name, default) in enumerate(zip(FIELD_NAMES, FIELD_DEFAULTS)):
+        text = parts[index].strip() if index < len(parts) else ""
         if not text:
-            return default
-        return float(text)
+            row[name] = default
+            continue
+        try:
+            row[name] = float(text)
+        except ValueError:
+            return None
+    if not math.isfinite(row["sim_time_s"]):
+        return None
+    return row
 
+
+def reader_thread(comm):
+    log("Reader thread started.")
     while not sim_finished.is_set():
         line = comm.read_line()
         if not line:
             if isinstance(comm, StdinComm):
                 break
             continue
-
         line = line.strip()
         if not line or "," not in line or "DATA_START" in line:
             continue
-
-        try:
-            parts = line.split(",")
-            if len(parts) >= 5:
-                data_queue.put(
-                    (
-                        value(parts, 0),  # time
-                        value(parts, 1),  # power
-                        value(parts, 2),  # fuel temperature
-                        value(parts, 3),  # rho
-                        value(parts, 4),  # dollars
-                        value(parts, 5),  # coolant temperature
-                        value(parts, 6),  # iodine
-                        value(parts, 7),  # xenon
-                        value(parts, 8),  # xenon reactivity
-                        value(parts, 9),  # time compression factor
-                        value(parts, 10),  # rod position
-                        value(parts, 11),  # rod target
-                        value(parts, 12),  # engine order
-                        value(parts, 13),  # target h
-                        value(parts, 14),  # real step time
-                        value(parts, 15, 0.0),  # decay heat
-                        value(parts, 16, 0.0),  # plant mode
-                        value(parts, 17, float("nan")),  # rho_rod_dlr
-                        value(parts, 18, float("nan")),  # rho_fuel_dlr
-                        value(parts, 19, float("nan")),  # rho_coolant_dlr
-                        value(parts, 20, float("nan")),  # rho_xenon_dlr
-                        value(parts, 21, 0.75),  # rod_critical
-                        value(parts, 22, 0.0),   # scram_active
-                    )
-                )
-        except ValueError:
-            continue
-
+        row = parse_telemetry(line)
+        if row is not None:
+            data_queue.put(row)
     log("Reader thread finished.")
     sim_finished.set()
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Real-Time Reactor Plotter")
-    parser.add_argument(
-        "--source",
-        choices=("serial", "stdout"),
-        default="serial",
-        help="Input source: serial reads COM/UART, stdout reads CSV lines piped from a process",
+# ---------------------------------------------------------------------------
+# Reactor-core schematic (raster particle renderer)
+# ---------------------------------------------------------------------------
+
+def _rgb(color):
+    return np.asarray(mcolors.to_rgb(color), dtype=np.float32)
+
+
+def _gaussian_kernel(radius, sigma):
+    axis = np.arange(-radius, radius + 1, dtype=np.float32)
+    xx, yy = np.meshgrid(axis, axis)
+    kernel = np.exp(-(xx * xx + yy * yy) / (2.0 * sigma * sigma))
+    peak = float(kernel.max())
+    return kernel / peak if peak > 0.0 else kernel
+
+
+class FissionField:
+    """Many small split sparks. Count and speed follow neutron power."""
+
+    MAX_FISSIONS = 460
+    MEAN_LIFE = 0.24
+
+    def __init__(self, fuel_x, core_bottom, core_top):
+        self.fuel_x = fuel_x
+        self.core_bottom = core_bottom
+        self.core_top = core_top
+        self.rng = random.Random()
+        self.events = []
+
+    def _intensity(self, n):
+        n = n if math.isfinite(n) and n > 0.0 else 0.0
+        return min(1.0, n / 1.5)
+
+    def _target_count(self, n):
+        if not math.isfinite(n) or n < 0.003:
+            return 0
+        density = self._intensity(n) ** 0.5
+        return min(self.MAX_FISSIONS, int(round(24 + 430 * density)))
+
+    def _spawn(self, speed, intensity, age=0.0):
+        cx = self.rng.choice(self.fuel_x)
+        for _ in range(8):
+            mid = self.rng.random()
+            if self.rng.random() < 0.28 + 0.72 * math.sin(math.pi * mid):
+                break
+        y = self.core_bottom + mid * (self.core_top - self.core_bottom)
+        angle = self.rng.uniform(0.0, math.tau)
+        life = self.rng.uniform(0.14, 0.34)
+        self.events.append({
+            "x": cx + self.rng.uniform(-0.42, 0.42),
+            "y": y,
+            "ux": math.cos(angle),
+            "uy": math.sin(angle),
+            "n_angle": angle + self.rng.choice((-1.0, 1.0)) * self.rng.uniform(0.6, 1.4),
+            "speed": speed * self.rng.uniform(0.7, 1.3),
+            "age": min(age, life * 0.85),
+            "life": life,
+            "neutrons": intensity > 0.08,
+        })
+
+    def update(self, n, dt):
+        intensity = self._intensity(n)
+        target = self._target_count(n)
+        speed = 0.22 + 1.15 * intensity
+        dt = max(0.0, min(0.12, dt))
+        for event in self.events:
+            event["age"] += dt
+        self.events = [event for event in self.events if event["age"] < event["life"]]
+        if len(self.events) > target:
+            self.events.sort(key=lambda event: event["age"], reverse=True)
+            del self.events[target:]
+        seed_field = not self.events
+        while len(self.events) < target:
+            age = self.rng.uniform(0.0, self.MEAN_LIFE * 0.75) if seed_field else 0.0
+            self._spawn(speed, intensity, age=age)
+        return intensity
+
+
+class CoreView:
+    """Rasterized core: gradient fuel/moderator plus additive fission sparks."""
+
+    WORLD_W = 10.4
+    WORLD_H = 11.85
+    IMG_W = 440
+    IMG_H = 780
+
+    FUEL_X = (2.35, 3.55, 4.75, 5.95, 7.15, 8.35)
+    CTRL_X = (2.95, 4.15, 5.35, 6.55, 7.75)
+    CTRL_STAGGER = (0.00, 0.08, -0.05, 0.06, -0.04)
+    CORE_BOTTOM = 2.6
+    CORE_TOP = 8.9
+    ROD_TOP = 10.85
+
+    COOL_COLD = _rgb("#16324f")
+    COOL_HOT = _rgb("#8a4632")
+    FUEL_COLD = _rgb("#3f231b")
+    FUEL_HOT = _rgb("#ff8c2e")
+    VESSEL = _rgb("#10161e")
+    VESSEL_EDGE = _rgb("#3a4654")
+    ROD = _rgb("#5b6878")
+    ROD_EDGE = _rgb("#8b98a8")
+    CHERENKOV = np.array([0.22, 0.78, 1.00], dtype=np.float32)
+    FRAG = np.array([1.00, 0.82, 0.42], dtype=np.float32)
+    FLASH = np.array([1.00, 0.96, 0.82], dtype=np.float32)
+    NEUTRON = np.array([0.70, 0.90, 1.00], dtype=np.float32)
+
+    def __init__(self, ax):
+        self.ax = ax
+        ax.set_xlim(0, self.WORLD_W)
+        ax.set_ylim(0, self.WORLD_H)
+        ax.axis("off")
+
+        ax.text(0.02, 1.00, "REACTOR CORE", transform=ax.transAxes, va="top",
+                fontsize=10, fontweight="bold", color=TEXT, zorder=10)
+        self.plant_txt = ax.text(0.02, 0.955, PLANT_NAMES[0], transform=ax.transAxes,
+                                 va="top", fontsize=8, color=MUTED, zorder=10)
+        self.rod_txt = ax.text(0.98, 1.00, "", transform=ax.transAxes, va="top",
+                               ha="right", fontsize=8, color=MUTED, zorder=10)
+
+        self._rgb = np.zeros((self.IMG_H, self.IMG_W, 3), dtype=np.float32)
+        self._base = np.zeros_like(self._rgb)
+        self._build_base()
+        self._rgb[:] = self._base
+        self.image = ax.imshow(
+            self._rgb, origin="upper", aspect="auto", interpolation="bilinear",
+            extent=(0.0, self.WORLD_W, 0.0, self.WORLD_H), zorder=1,
+        )
+
+        self._last_tick = None
+        self.fission = FissionField(self.FUEL_X, self.CORE_BOTTOM, self.CORE_TOP)
+        self._kern_frag = _gaussian_kernel(1, 0.50)
+        self._kern_flash = _gaussian_kernel(1, 0.70)
+        self._kern_neu = _gaussian_kernel(1, 0.42)
+
+        self.badge = ax.text(5.2, 9.42, "", ha="center", va="center", fontsize=11,
+                             fontweight="bold", color="#ffdcd7", zorder=12,
+                             bbox={"boxstyle": "round,pad=0.45", "facecolor": C_SCRAM,
+                                   "edgecolor": "none", "alpha": 0.92})
+        self.badge.set_visible(False)
+
+        for x, color, label in ((0.95, "#b3541e", "fuel"),
+                                (3.05, "#5b6878", "control rods"),
+                                (6.15, "#16324f", "moderator"),
+                                (8.45, "#c9a36a", "fission")):
+            ax.add_patch(Rectangle((x, 0.42), 0.38, 0.38, facecolor=color,
+                                   edgecolor=PANEL_EDGE, linewidth=0.6, zorder=10))
+            ax.text(x + 0.50, 0.61, label, va="center", fontsize=7.2, color=MUTED, zorder=10)
+
+    def _px(self, x):
+        return x / self.WORLD_W * (self.IMG_W - 1)
+
+    def _py(self, y):
+        return (1.0 - y / self.WORLD_H) * (self.IMG_H - 1)
+
+    def _clamp_rect(self, x0, y0, x1, y1):
+        ix0 = max(0, min(self.IMG_W, int(round(min(x0, x1)))))
+        ix1 = max(0, min(self.IMG_W, int(round(max(x0, x1)))))
+        iy0 = max(0, min(self.IMG_H, int(round(min(y0, y1)))))
+        iy1 = max(0, min(self.IMG_H, int(round(max(y0, y1)))))
+        return ix0, iy0, ix1, iy1
+
+    def _fill(self, buf, x0, y0, x1, y1, color):
+        ix0, iy0, ix1, iy1 = self._clamp_rect(x0, y0, x1, y1)
+        if ix1 > ix0 and iy1 > iy0:
+            buf[iy0:iy1, ix0:ix1] = color
+
+    def _build_base(self):
+        bg = _rgb(BG)
+        self._base[:] = bg
+        # Vessel shell, then a slightly inset inner well.
+        self._fill(self._base, self._px(0.85), self._py(10.50), self._px(9.55), self._py(1.45),
+                   self.VESSEL_EDGE)
+        self._fill(self._base, self._px(0.92), self._py(10.42), self._px(9.48), self._py(1.53),
+                   self.VESSEL)
+        # Guide tubes.
+        for cx in self.CTRL_X:
+            self._fill(self._base, self._px(cx - 0.20), self._py(10.05),
+                       self._px(cx + 0.20), self._py(self.CORE_BOTTOM),
+                       np.array([0.12, 0.16, 0.21], dtype=np.float32))
+        # Drive housings.
+        for cx in self.CTRL_X:
+            self._fill(self._base, self._px(cx - 0.28), self._py(11.00),
+                       self._px(cx + 0.28), self._py(10.05),
+                       np.array([0.07, 0.09, 0.12], dtype=np.float32))
+        self._mod_x0, self._mod_y0, self._mod_x1, self._mod_y1 = self._clamp_rect(
+            self._px(1.30), self._py(10.05), self._px(9.10), self._py(1.90),
+        )
+
+    def _stamp(self, cx, cy, kernel, rgb, gain):
+        if gain <= 0.002:
+            return
+        radius = kernel.shape[0] // 2
+        x = int(round(cx))
+        y = int(round(cy))
+        if x < self._mod_x0 or x >= self._mod_x1 or y < self._mod_y0 or y >= self._mod_y1:
+            return
+        x0 = x - radius
+        y0 = y - radius
+        x1 = x0 + kernel.shape[1]
+        y1 = y0 + kernel.shape[0]
+        kx0 = 0 if x0 >= 0 else -x0
+        ky0 = 0 if y0 >= 0 else -y0
+        kx1 = kernel.shape[1] - max(0, x1 - self.IMG_W)
+        ky1 = kernel.shape[0] - max(0, y1 - self.IMG_H)
+        x0 = max(0, x0)
+        y0 = max(0, y0)
+        x1 = min(self.IMG_W, x1)
+        y1 = min(self.IMG_H, y1)
+        if x1 <= x0 or y1 <= y0:
+            return
+        patch = kernel[ky0:ky1, kx0:kx1] * gain
+        self._rgb[y0:y1, x0:x1] += patch[:, :, None] * rgb
+
+    def _draw_fuel_rod(self, cx, tf, n):
+        x0 = self._px(cx - 0.31)
+        x1 = self._px(cx + 0.31)
+        y_top = self._py(self.CORE_TOP)
+        y_bot = self._py(self.CORE_BOTTOM)
+        ix0, iy0, ix1, iy1 = self._clamp_rect(x0, y_top, x1, y_bot)
+        if ix1 <= ix0 or iy1 <= iy0:
+            return
+        rows = iy1 - iy0
+        # Image y increases downward; top of rod is CORE_TOP.
+        mid = (np.arange(rows, dtype=np.float32) + 0.5) / rows
+        peaking = 0.35 + 0.65 * np.sin(np.pi * mid)
+        heat = np.clip((tf - 265.0) / 500.0, 0.0, 1.2)
+        mix = np.clip(heat * peaking, 0.0, 1.0)[:, None]
+        body = self.FUEL_COLD[None, :] + (self.FUEL_HOT - self.FUEL_COLD)[None, :] * mix
+        self._rgb[iy0:iy1, ix0:ix1] = body[:, None, :]
+        # Thin inner filament.
+        hx0 = int(round(self._px(cx - 0.08)))
+        hx1 = int(round(self._px(cx + 0.08)))
+        hx0 = max(ix0, hx0)
+        hx1 = min(ix1, hx1)
+        if hx1 > hx0:
+            filament = np.clip(body * (1.12 + 0.10 * min(1.0, n / 1.5)), 0.0, 1.0)
+            self._rgb[iy0:iy1, hx0:hx1] = filament[:, None, :]
+
+    def _draw_control_rod(self, cx, tip_y):
+        x0 = self._px(cx - 0.16)
+        x1 = self._px(cx + 0.16)
+        y_top = self._py(self.ROD_TOP)
+        y_bot = self._py(tip_y)
+        ix0, iy0, ix1, iy1 = self._clamp_rect(x0, y_top, x1, y_bot)
+        if ix1 <= ix0 or iy1 <= iy0:
+            return
+        width = ix1 - ix0
+        shade = np.linspace(1.18, 0.72, width, dtype=np.float32)
+        metal = np.clip(self.ROD[None, :] * shade[:, None], 0.0, 1.0)
+        self._rgb[iy0:iy1, ix0:ix1] = metal[None, :, :]
+        # Specular edge.
+        if width > 2:
+            self._rgb[iy0:iy1, ix0:ix0 + 1] = np.clip(self.ROD_EDGE, 0.0, 1.0)
+
+    def _draw_fission(self, intensity):
+        for event in self.fission.events:
+            life_left = 1.0 - event["age"] / event["life"]
+            fade = life_left * life_left
+            travel = event["speed"] * event["age"]
+            x0, y0 = event["x"], event["y"]
+            dx = event["ux"] * travel
+            dy = event["uy"] * travel
+            px0, py0 = self._px(x0), self._py(y0)
+            px1, py1 = self._px(x0 + dx), self._py(y0 + dy)
+            px2, py2 = self._px(x0 - dx), self._py(y0 - dy)
+
+            frag_gain = (0.16 + 0.10 * intensity) * (0.45 + 0.55 * fade)
+            self._stamp(px1, py1, self._kern_frag, self.FRAG, frag_gain)
+            self._stamp(px2, py2, self._kern_frag, self.FRAG, frag_gain * 0.8)
+
+            if event["age"] < 0.04:
+                flash_gain = (0.18 + 0.08 * intensity) * (1.0 - event["age"] / 0.04)
+                self._stamp(px0, py0, self._kern_flash, self.FLASH, flash_gain)
+
+            if event["neutrons"]:
+                n_travel = travel * 1.7
+                nx = math.cos(event["n_angle"])
+                ny = math.sin(event["n_angle"])
+                neu_gain = (0.10 + 0.08 * intensity) * fade
+                self._stamp(self._px(x0 + nx * n_travel), self._py(y0 + ny * n_travel),
+                            self._kern_neu, self.NEUTRON, neu_gain)
+                self._stamp(self._px(x0 - nx * n_travel * 0.4), self._py(y0 - ny * n_travel * 0.4),
+                            self._kern_neu, self.NEUTRON, neu_gain * 0.5)
+
+    def set_plant(self, mode):
+        self.plant_txt.set_text(PLANT_NAMES.get(mode, "Unknown preset"))
+
+    def update(self, n, tf, tc, rod_position, scram, fault):
+        n = n if math.isfinite(n) else 0.0
+        tf = tf if math.isfinite(tf) else 293.0
+        tc = tc if math.isfinite(tc) else 293.0
+        rod_position = rod_position if math.isfinite(rod_position) else 0.0
+        rod_position = min(1.0, max(0.0, rod_position))
+
+        now = time.monotonic()
+        dt = 0.05 if self._last_tick is None else now - self._last_tick
+        self._last_tick = now
+
+        intensity = self.fission.update(n, dt)
+        self._rgb[:] = self._base
+
+        cool = self.COOL_COLD + (self.COOL_HOT - self.COOL_COLD) * np.clip((tc - 275.0) / 175.0, 0.0, 1.0)
+        cherenkov = min(0.16, max(0.0, 0.12 * n / 1.5))
+        moderator = np.clip(cool * (1.0 - 0.35 * cherenkov) + self.CHERENKOV * cherenkov, 0.0, 1.0)
+        self._rgb[self._mod_y0:self._mod_y1, self._mod_x0:self._mod_x1] = moderator
+
+        for cx in self.FUEL_X:
+            self._draw_fuel_rod(cx, tf, n)
+        self._draw_fission(intensity)
+
+        inserted = 1.0 - rod_position
+        for cx, stagger in zip(self.CTRL_X, self.CTRL_STAGGER):
+            tip_y = self.CORE_TOP - inserted * (self.CORE_TOP - self.CORE_BOTTOM) + stagger * inserted
+            tip_y = min(self.CORE_TOP, max(self.CORE_BOTTOM, tip_y))
+            self._draw_control_rod(cx, tip_y)
+
+        np.clip(self._rgb, 0.0, 1.0, out=self._rgb)
+        self.image.set_data(self._rgb)
+
+        self.rod_txt.set_text(f"rods {rod_position * 100.0:.1f}% withdrawn")
+        if fault:
+            self.badge.set_text("NUMERICAL TRIP")
+            self.badge.set_visible(True)
+        elif scram:
+            self.badge.set_text("SCRAM")
+            self.badge.set_visible(True)
+        else:
+            self.badge.set_visible(False)
+
+
+# ---------------------------------------------------------------------------
+# Telemetry panel
+# ---------------------------------------------------------------------------
+
+def fmt_float(digits):
+    def inner(value):
+        return f"{value:.{digits}f}" if math.isfinite(value) else "—"
+    return inner
+
+
+def fmt_signed(value):
+    return f"{value:+.3f} $" if math.isfinite(value) else "—"
+
+
+def fmt_percent(value):
+    return f"{value * 100.0:.1f} %" if math.isfinite(value) else "—"
+
+
+def fmt_celsius(value):
+    return f"{value:.1f} °C" if math.isfinite(value) else "—"
+
+
+class StatusPanel:
+    ROWS = (
+        (("Neutron power", "n", fmt_float(4)), ("Thermal power", "thermal", fmt_float(4))),
+        (("Fuel temp", "Tf", fmt_celsius), ("Coolant temp", "Tc", fmt_celsius)),
+        (("Reactivity", "rho_dollars", fmt_signed), ("Critical rod", "critical_rod_position", fmt_percent)),
+        (("Rod position", "rod_position", fmt_percent), ("Rod target", "rod_target", fmt_percent)),
+        (("Iodine ratio", "I_norm", fmt_float(3)), ("Xenon ratio", "Xe_norm", fmt_float(3))),
     )
+
+    def __init__(self, ax):
+        ax.axis("off")
+        ax.add_patch(FancyBboxPatch((0.012, 0.02), 0.976, 0.96, transform=ax.transAxes,
+                                    boxstyle="round,pad=0.008,rounding_size=0.03",
+                                    facecolor=PANEL, edgecolor=PANEL_EDGE, linewidth=1.0))
+        ax.text(0.045, 0.90, "TELEMETRY", fontsize=8.5, fontweight="bold",
+                color=MUTED, transform=ax.transAxes, va="center")
+        self.values = {}
+        columns = ((0.045, 0.475), (0.545, 0.965))
+        for row_index, row in enumerate(self.ROWS):
+            y = 0.76 - row_index * 0.13
+            for (label, key, formatter), (label_x, value_x) in zip(row, columns):
+                ax.text(label_x, y, label, fontsize=7.8, color=MUTED,
+                        transform=ax.transAxes, va="center")
+                text = ax.text(value_x, y, "—", fontsize=8.8, fontweight="bold",
+                               color=TEXT, transform=ax.transAxes, va="center", ha="right")
+                self.values[key] = (text, formatter)
+
+    def update(self, latest, thermal):
+        merged = dict(latest)
+        merged["thermal"] = thermal
+        for key, (text, formatter) in self.values.items():
+            text.set_text(formatter(merged.get(key, NAN)))
+
+
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
+
+def style_axes(ax):
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(PANEL_EDGE)
+    ax.grid(True, alpha=0.55)
+    ax.tick_params(length=0)
+
+
+def build_dashboard(args, comm):
+    apply_theme()
+    fig = plt.figure(figsize=(15.4, 9.0))
+    if fig.canvas.manager:
+        fig.canvas.manager.set_window_title("Point-Kinetics Reactor")
+
+    fig.text(0.052, 0.972, "Point-Kinetics Reactor Simulator", fontsize=13,
+             fontweight="bold", color=TEXT)
+    source_label = "UART" if args.source == "serial" else "PIPE"
+    fig.text(0.052, 0.952, f"source {source_label}", fontsize=8, color=MUTED)
+    live_txt = fig.text(0.494, 0.965, "", fontsize=9, color=MUTED, ha="right")
+
+    # --- Trend charts -------------------------------------------------------
+    charts = []
+    for spec in CHART_DEFS:
+        ax = fig.add_axes((0.052, 0.1, 0.442, 0.1))
+        style_axes(ax)
+        ax.set_ylabel(spec["ylabel"])
+        if spec.get("log"):
+            ax.set_yscale("log")
+        if "hline" in spec:
+            level, label = spec["hline"]
+            ax.axhline(level, color=C_SCRAM, linestyle="--", linewidth=1.0, alpha=0.65, label=label)
+        lines = {}
+        for field, label, color, linestyle, width in spec["series"]:
+            line, = ax.plot([], [], color=color, linestyle=linestyle, linewidth=width, label=label)
+            lines[field] = line
+        ax.legend(loc="upper left", fontsize=7.4, ncol=4, handlelength=1.6,
+                  borderaxespad=0.2, labelcolor=MUTED)
+        value_txt = ax.text(0.995, 0.96, "", transform=ax.transAxes, ha="right",
+                            va="top", fontsize=7.8, color=TEXT, fontweight="bold")
+        charts.append({
+            "spec": spec, "ax": ax, "lines": lines, "value_txt": value_txt,
+            "visible": not spec.get("hidden", False),
+            "event_artists": [],
+        })
+
+    # Optional-chart cycle starts on poison (visible); components and timing hidden.
+    optional_index = 0
+
+    def layout_charts():
+        visible = [chart for chart in charts if chart["visible"]]
+        top, bottom, gap = 0.940, 0.075, 0.032
+        height = (top - bottom - gap * (len(visible) - 1)) / max(1, len(visible))
+        y = top
+        for index, chart in enumerate(visible):
+            ax = chart["ax"]
+            ax.set_visible(True)
+            ax.set_position((0.052, y - height, 0.442, height))
+            last = index == len(visible) - 1
+            ax.tick_params(labelbottom=last)
+            ax.set_xlabel("Time (s)" if last else "")
+            y -= height + gap
+        for chart in charts:
+            if not chart["visible"]:
+                chart["ax"].set_visible(False)
+        fig.canvas.draw_idle()
+
+    layout_charts()
+
+    # --- Core schematic and telemetry panel ---------------------------------
+    core = CoreView(fig.add_axes((0.516, 0.330, 0.252, 0.610)))
+    status = StatusPanel(fig.add_axes((0.516, 0.062, 0.252, 0.248)))
+
+    # --- Controls ------------------------------------------------------------
+    def section(label, y):
+        fig.text(0.802, y, label, fontsize=7.6, fontweight="bold", color=MUTED)
+
+    def style_button(button, color, hover, size=9):
+        button.color = color
+        button.hovercolor = hover
+        button.ax.set_facecolor(color)
+        button.label.set_color(TEXT)
+        button.label.set_fontsize(size)
+        button.label.set_fontweight("bold")
+        for spine in button.ax.spines.values():
+            spine.set_edgecolor(PANEL_EDGE)
+
+    widgets = []
+
+    section("SAFETY", 0.936)
+    scram_btn = Button(fig.add_axes((0.802, 0.868, 0.168, 0.058)), "SCRAM")
+    style_button(scram_btn, C_SCRAM, C_SCRAM_HOVER, size=11)
+    widgets.append(scram_btn)
+    clear_btn = Button(fig.add_axes((0.802, 0.818, 0.168, 0.040)), "Clear SCRAM")
+    style_button(clear_btn, C_CLEAR_DIM, C_CLEAR, size=8)
+    widgets.append(clear_btn)
+
+    section("CONTROL ROD TARGET", 0.778)
+    rod_ax = fig.add_axes((0.808, 0.736, 0.156, 0.026))
+    rod_ax.set_facecolor("#232b36")
+    rod_slider = Slider(rod_ax, "", 0.0, 1.0, valinit=0.75, initcolor="none",
+                        color=ACCENT, track_color="#232b36",
+                        handle_style={"facecolor": TEXT, "edgecolor": ACCENT, "size": 10})
+    rod_slider.valtext.set_visible(False)
+    # Critical-rod tick on the slider track.
+    crit_line = rod_ax.axvline(0.75, color="#fbbf24", linewidth=1.6, alpha=0.95, zorder=5)
+    crit_label = fig.text(0.886, 0.700, "crit —   target 75.0%", fontsize=7.2,
+                          color=MUTED, ha="center")
+    widgets.append(rod_slider)
+
+    section("VIEW WINDOW", 0.668)
+    window_buttons = []
+    window_width = 0.038
+    window_gap = 0.004
+    for index, (label, _) in enumerate(WINDOW_PRESETS):
+        x = 0.802 + index * (window_width + window_gap)
+        btn = Button(fig.add_axes((x, 0.628, window_width, 0.032)), label)
+        style_button(btn, C_BTN, C_BTN_HOVER, size=7)
+        window_buttons.append(btn)
+        widgets.append(btn)
+
+    pause_btn = Button(fig.add_axes((0.802, 0.582, 0.168, 0.036)), "Pause display")
+    style_button(pause_btn, C_BTN, C_BTN_HOVER, size=8)
+    widgets.append(pause_btn)
+
+    section("SIMULATION SPEED", 0.548)
+    speed_ax = fig.add_axes((0.802, 0.432, 0.168, 0.104))
+    speed_ax.set_facecolor(PANEL)
+    speed_radio = RadioButtons(speed_ax, ("Realtime 1x", "Training 10x", "Xenon 1000x"),
+                               active=0, activecolor=ACCENT)
+    widgets.append(speed_radio)
+
+    section("PLANT PRESET", 0.396)
+    plant_ax = fig.add_axes((0.802, 0.280, 0.168, 0.104))
+    plant_ax.set_facecolor(PANEL)
+    plant_radio = RadioButtons(plant_ax, ("PWR-SMR", "RBMK-like", "TMI-loss"),
+                               active=0, activecolor=ACCENT)
+    widgets.append(plant_radio)
+
+    for radio in (speed_radio, plant_radio):
+        for label in radio.labels:
+            label.set_color(TEXT)
+            label.set_fontsize(8)
+        for spine in radio.ax.spines.values():
+            spine.set_edgecolor(PANEL_EDGE)
+
+    section("POWER RESET", 0.244)
+    power_ax = fig.add_axes((0.802, 0.190, 0.168, 0.040))
+    power_box = TextBox(power_ax, "", initial=f"{args.power:.2f}")
+    power_ax.set_facecolor("#232b36")
+    power_box.text_disp.set_color(TEXT)
+    power_box.text_disp.set_fontsize(9)
+    if hasattr(power_box, "cursor"):
+        power_box.cursor.set_color(TEXT)
+    for spine in power_ax.spines.values():
+        spine.set_edgecolor(PANEL_EDGE)
+    widgets.append(power_box)
+    reset_btn = Button(fig.add_axes((0.802, 0.140, 0.168, 0.040)), "Reset at power")
+    style_button(reset_btn, C_BTN, C_BTN_HOVER, size=8)
+    widgets.append(reset_btn)
+
+    fig.text(0.802, 0.090,
+             "Keys\nR scram  K clear  P reset\nSpace pause  D cycle chart\n↑ ↓ rod ±1%",
+             fontsize=7.2, color=MUTED, linespacing=1.55, va="top")
+
+    # --- State ----------------------------------------------------------------
+    history = {"t": []}
+    for field in SERIES_FIELDS:
+        history[field] = []
+    events = []  # list of {"t", "kind", "label"}
+    latest = {}
+    state = {
+        "plant": 0,
+        "slider_suppressed": False,
+        "paused": False,
+        "window_seconds": None if args.plot_mode == "full" else args.window,
+        "window_all": args.plot_mode == "full",
+        "prev_scram": False,
+        "prev_fault": False,
+        "prev_plant": None,
+        "prev_rod_target": None,
+        "scram_ui": False,
+        # Pending rod-adjustment burst: coalesce rapid ±1% clicks into one marker.
+        "rod_burst": None,  # {"start", "end", "last_t"} or None
+    }
+
+    def clear_history():
+        for values in history.values():
+            values.clear()
+        events.clear()
+        for chart in charts:
+            for line in chart["lines"].values():
+                line.set_data([], [])
+            chart["value_txt"].set_text("")
+            chart["ax"].set_xlim(0, INITIAL_X_SECONDS)
+            for artist in chart["event_artists"]:
+                artist.remove()
+            chart["event_artists"] = []
+        state["prev_scram"] = False
+        state["prev_fault"] = False
+        state["prev_plant"] = None
+        state["prev_rod_target"] = None
+        state["rod_burst"] = None
+
+    def drain_queue():
+        while True:
+            try:
+                data_queue.get_nowait()
+            except queue.Empty:
+                break
+
+    def record_event(t, kind, label):
+        if events and abs(events[-1]["t"] - t) < 0.05 and events[-1]["kind"] == kind:
+            return
+        events.append({"t": t, "kind": kind, "label": label})
+
+    def flush_rod_burst(at_time=None):
+        """Commit a coalesced rod-target change as a single chart marker.
+
+        The vertical line is placed at the *start* of the adjustment burst
+        (first click), where the physics response begins — not at the quiet
+        timeout or the last click.
+        """
+        burst = state["rod_burst"]
+        if burst is None:
+            return
+        start = burst["start"]
+        end = burst["end"]
+        t = burst["first_t"]
+        state["rod_burst"] = None
+        if abs(end - start) < ROD_EVENT_MIN_DELTA:
+            return
+        record_event(t, "rod", f"rod {start * 100:.0f}->{end * 100:.0f}%")
+
+    def note_rod_target(t, rod_target, scram_now):
+        """Accumulate rod changes; emit one marker after ROD_COALESCE_S of quiet."""
+        if rod_target is None:
+            return
+        prev = state["prev_rod_target"]
+        if prev is None:
+            state["prev_rod_target"] = rod_target
+            return
+
+        changed = abs(rod_target - prev) > ROD_EVENT_MIN_DELTA
+        if changed and not scram_now:
+            burst = state["rod_burst"]
+            if burst is None:
+                state["rod_burst"] = {
+                    "start": prev,
+                    "end": rod_target,
+                    "first_t": t,
+                    "last_t": t,
+                }
+            else:
+                burst["end"] = rod_target
+                burst["last_t"] = t
+        elif changed and scram_now:
+            # SCRAM forces target to 0; drop any pending burst without a rod marker.
+            state["rod_burst"] = None
+
+        state["prev_rod_target"] = rod_target
+
+        burst = state["rod_burst"]
+        if burst is not None and (t - burst["last_t"]) >= ROD_COALESCE_S:
+            flush_rod_burst()
+
+    def detect_events(row, t):
+        scram_now = row["scram_active"] >= 0.5
+        fault_now = row["engine_status"] <= 0.0
+        plant_now = int(row["plant_mode"]) if math.isfinite(row["plant_mode"]) else state["plant"]
+        rod_target = row["rod_target"] if math.isfinite(row["rod_target"]) else None
+
+        if state["prev_scram"] is False and scram_now and not fault_now:
+            flush_rod_burst()
+            record_event(t, "SCRAM", "SCRAM")
+        if state["prev_scram"] is True and not scram_now:
+            record_event(t, "clear", "clear")
+        if state["prev_fault"] is False and fault_now:
+            flush_rod_burst()
+            record_event(t, "trip", "trip")
+        if state["prev_plant"] is not None and plant_now != state["prev_plant"]:
+            flush_rod_burst()
+            record_event(t, "plant", f"C{plant_now}")
+
+        note_rod_target(t, rod_target, scram_now)
+
+        state["prev_scram"] = scram_now
+        state["prev_fault"] = fault_now
+        state["prev_plant"] = plant_now
+
+    def redraw_event_markers(window_start, window_end):
+        top_visible = next((chart for chart in charts if chart["visible"]), None)
+        for chart in charts:
+            for artist in chart["event_artists"]:
+                artist.remove()
+            chart["event_artists"] = []
+            if not chart["visible"]:
+                continue
+            ax = chart["ax"]
+            # Deduplicate labels only for one-shot kinds (SCRAM/clear/trip/plant).
+            # Rod bursts each get their own label — otherwise later adjustments
+            # leave an unexplained vertical line.
+            labeled_once = set()
+            for event in events:
+                if event["t"] < window_start or event["t"] > window_end:
+                    continue
+                color = C_EVENT.get(event["kind"], MUTED)
+                line = ax.axvline(event["t"], color=color, linewidth=1.15,
+                                  alpha=0.85, linestyle="--", zorder=3)
+                chart["event_artists"].append(line)
+                if chart is not top_visible:
+                    continue
+                if event["kind"] != "rod" and event["kind"] in labeled_once:
+                    continue
+                labeled_once.add(event["kind"])
+                txt = ax.text(event["t"], 0.98, event["label"], transform=ax.get_xaxis_transform(),
+                              fontsize=6.5, color=color, ha="center", va="top",
+                              clip_on=True, zorder=4)
+                chart["event_artists"].append(txt)
+
+    def set_scram_button_state(scram_active):
+        state["scram_ui"] = scram_active
+        if scram_active:
+            style_button(scram_btn, C_SCRAM_DIM, C_SCRAM_DIM, size=11)
+            style_button(clear_btn, C_CLEAR_ARMED, C_CLEAR_ARMED_HOVER, size=8)
+            clear_btn.label.set_text("Clear SCRAM  ●")
+        else:
+            style_button(scram_btn, C_SCRAM, C_SCRAM_HOVER, size=11)
+            style_button(clear_btn, C_CLEAR_DIM, C_CLEAR, size=8)
+            clear_btn.label.set_text("Clear SCRAM")
+
+    def highlight_window_buttons():
+        for index, (btn, (_, seconds)) in enumerate(zip(window_buttons, WINDOW_PRESETS)):
+            if state["window_all"] and seconds is None:
+                style_button(btn, C_BTN_ACTIVE, C_BTN_HOVER, size=7)
+            elif (not state["window_all"] and seconds is not None
+                  and abs(state["window_seconds"] - seconds) < 0.5):
+                style_button(btn, C_BTN_ACTIVE, C_BTN_HOVER, size=7)
+            else:
+                style_button(btn, C_BTN, C_BTN_HOVER, size=7)
+
+    def set_window_preset(index):
+        label, seconds = WINDOW_PRESETS[index]
+        if seconds is None:
+            state["window_all"] = True
+            state["window_seconds"] = None
+        else:
+            state["window_all"] = False
+            state["window_seconds"] = seconds
+        highlight_window_buttons()
+        fig.canvas.draw_idle()
+
+    def set_pause(paused):
+        state["paused"] = paused
+        if paused:
+            pause_btn.label.set_text("Resume display")
+            style_button(pause_btn, C_BTN_ACTIVE, C_BTN_HOVER, size=8)
+            live_txt.set_text("PAUSED")
+            live_txt.set_color(ACCENT)
+        else:
+            pause_btn.label.set_text("Pause display")
+            style_button(pause_btn, C_BTN, C_BTN_HOVER, size=8)
+        fig.canvas.draw_idle()
+
+    # --- Commands ---------------------------------------------------------------
+    def set_slider(value):
+        state["slider_suppressed"] = True
+        try:
+            rod_slider.set_val(min(1.0, max(0.0, value)))
+        finally:
+            state["slider_suppressed"] = False
+
+    def on_slider(value):
+        crit = latest.get("critical_rod_position", NAN)
+        crit_txt = f"{crit * 100.0:.1f}%" if math.isfinite(crit) else "—"
+        crit_label.set_text(f"crit {crit_txt}   target {value * 100.0:.1f}%")
+        if not state["slider_suppressed"]:
+            comm.write(f"W {value:.3f}\n")
+
+    def scram():
+        comm.write("R\n")
+        set_slider(0.0)
+        set_scram_button_state(True)
+
+    def clear_scram():
+        comm.write("K\n")
+        set_scram_button_state(False)
+
+    def reset_power(text):
+        try:
+            power = max(0.0, min(1.5, float(text)))
+        except ValueError:
+            return
+        drain_queue()
+        clear_history()
+        set_scram_button_state(False)
+        comm.write(f"P {power}\n")
+        fig.canvas.draw_idle()
+
+    def set_speed(label):
+        comm.write(f"M{('Realtime', 'Training', 'Xenon').index(label.split()[0])}\n")
+
+    def set_plant(label):
+        mode = ("PWR-SMR", "RBMK-like", "TMI-loss").index(label)
+        state["plant"] = mode
+        core.set_plant(mode)
+        drain_queue()
+        clear_history()
+        set_scram_button_state(False)
+        comm.write(f"C{mode}\n")
+        fig.canvas.draw_idle()
+
+    def cycle_optional_chart():
+        nonlocal optional_index
+        optional_index = (optional_index + 1) % len(OPTIONAL_CHARTS)
+        active = OPTIONAL_CHARTS[optional_index]
+        for chart in charts:
+            if chart["spec"]["key"] in OPTIONAL_CHARTS:
+                chart["visible"] = chart["spec"]["key"] == active
+        layout_charts()
+
+    def on_key(event):
+        key = (event.key or "").lower()
+        if key == "r":
+            scram()
+        elif key == "k":
+            clear_scram()
+        elif key == "p":
+            reset_power(power_box.text)
+        elif key == "d":
+            cycle_optional_chart()
+        elif key in (" ", "space"):
+            set_pause(not state["paused"])
+        elif key in ("up", "+", "="):
+            comm.write("+\n")
+        elif key in ("down", "-", "_"):
+            comm.write("-\n")
+
+    rod_slider.on_changed(on_slider)
+    scram_btn.on_clicked(lambda event: scram())
+    clear_btn.on_clicked(lambda event: clear_scram())
+    reset_btn.on_clicked(lambda event: reset_power(power_box.text))
+    power_box.on_submit(reset_power)
+    speed_radio.on_clicked(set_speed)
+    plant_radio.on_clicked(set_plant)
+    pause_btn.on_clicked(lambda event: set_pause(not state["paused"]))
+    for index, btn in enumerate(window_buttons):
+        btn.on_clicked(lambda event, i=index: set_window_preset(i))
+    fig.canvas.mpl_connect("key_press_event", on_key)
+    fig.canvas.mpl_connect("close_event", lambda event: sim_finished.set())
+
+    # Match CLI --window / --plot-mode to a preset highlight when possible.
+    if state["window_all"]:
+        highlight_window_buttons()
+    else:
+        matched = False
+        for index, (_, seconds) in enumerate(WINDOW_PRESETS):
+            if seconds is not None and abs(state["window_seconds"] - seconds) < 0.5:
+                set_window_preset(index)
+                matched = True
+                break
+        if not matched:
+            highlight_window_buttons()
+
+    # --- Frame update -------------------------------------------------------------
+    def update(_frame):
+        while True:
+            try:
+                row = data_queue.get_nowait()
+            except queue.Empty:
+                break
+            t = row["sim_time_s"]
+            if history["t"] and t < history["t"][-1]:
+                clear_history()
+            latest.clear()
+            latest.update(row)
+            history["t"].append(t)
+            thermal = PROMPT_FRACTION * row["n"] + row["decay_heat"]
+            for field in SERIES_FIELDS:
+                value = thermal if field == "thermal" else row.get(field, NAN)
+                if field in ("target_h_s", "step_real_time_s") and math.isfinite(value):
+                    value = max(1.0e-9, value)
+                history[field].append(value)
+            detect_events(row, t)
+
+        if not latest:
+            return
+
+        # Always keep SCRAM button / critical tick current even while paused.
+        fault = latest["engine_status"] <= 0.0
+        scram_active = latest["scram_active"] >= 0.5
+        if scram_active != state["scram_ui"]:
+            set_scram_button_state(scram_active)
+
+        crit = latest.get("critical_rod_position", NAN)
+        if math.isfinite(crit):
+            crit_line.set_xdata([crit, crit])
+            crit_txt = f"{crit * 100.0:.1f}%"
+        else:
+            crit_txt = "—"
+        crit_label.set_text(f"crit {crit_txt}   target {rod_slider.val * 100.0:.1f}%")
+
+        if state["paused"]:
+            return
+
+        thermal = PROMPT_FRACTION * latest["n"] + latest["decay_heat"]
+        times = history["t"]
+        max_t = times[-1]
+
+        if state["window_all"]:
+            window_start = 0.0
+            window_end = max(INITIAL_X_SECONDS, max_t + 10.0)
+            start_index = 0
+        else:
+            window = state["window_seconds"]
+            if max_t <= window:
+                window_start = 0.0
+                window_end = min(window, max(INITIAL_X_SECONDS, max_t + 10.0))
+            else:
+                window_start = max_t - window
+                window_end = max_t
+            start_index = bisect_left(times, window_start)
+        visible_times = times[start_index:]
+
+        for chart in charts:
+            if not chart["visible"]:
+                continue
+            ax = chart["ax"]
+            finite = []
+            for field, line in chart["lines"].items():
+                values = history[field][start_index:]
+                line.set_data(visible_times, values)
+                finite.extend(v for v in values if math.isfinite(v) and (v > 0 or not chart["spec"].get("log")))
+            ax.set_xlim(window_start, window_end)
+            key = chart["spec"]["key"]
+            if finite:
+                low, high = min(finite), max(finite)
+                if key == "power":
+                    ax.set_ylim(0.0, max(2.0, high * 1.25))
+                elif key == "temp":
+                    pad = max(15.0, (high - low) * 0.15)
+                    ax.set_ylim(low - pad, high + pad)
+                elif key == "rho":
+                    pad = max(0.4, (high - low) * 0.3)
+                    ax.set_ylim(low - pad, max(high + pad, 1.2))
+                elif key == "poison":
+                    pad = max(0.05, (high - low) * 0.25)
+                    ax.set_ylim(low - pad, high + pad)
+                elif key == "components":
+                    pad = max(0.15, (high - low) * 0.25)
+                    ax.set_ylim(low - pad, high + pad)
+                elif key == "timing":
+                    ax.set_ylim(low * 0.5, high * 2.0)
+            if key == "power":
+                chart["value_txt"].set_text(f"N {latest['n']:.4f}   thermal {thermal:.4f}")
+            elif key == "temp":
+                chart["value_txt"].set_text(f"Tf {latest['Tf']:.1f}   Tc {latest['Tc']:.1f} °C")
+            elif key == "rho":
+                chart["value_txt"].set_text(f"{latest['rho_dollars']:+.4f} $")
+            elif key == "poison":
+                chart["value_txt"].set_text(f"I {latest['I_norm']:.3f}   Xe {latest['Xe_norm']:.3f}")
+            elif key == "components":
+                chart["value_txt"].set_text(
+                    f"rod {latest['rho_rod_dollars']:+.2f}  "
+                    f"fuel {latest['rho_fuel_dollars']:+.2f}  "
+                    f"cool {latest['rho_coolant_dollars']:+.2f}  "
+                    f"Xe {latest['rho_xenon_dollars']:+.2f}"
+                )
+            elif key == "timing" and math.isfinite(latest["step_real_time_s"]):
+                chart["value_txt"].set_text(f"real {latest['step_real_time_s']:.2e} s")
+
+        redraw_event_markers(window_start, window_end)
+
+        plant_mode = int(latest["plant_mode"]) if math.isfinite(latest["plant_mode"]) else state["plant"]
+        if plant_mode != state["plant"]:
+            state["plant"] = plant_mode
+            core.set_plant(plant_mode)
+
+        core.update(latest["n"], latest["Tf"], latest["Tc"], latest["rod_position"],
+                    scram_active, fault)
+        status.update(latest, thermal)
+
+        sim_time = f"{max_t / 3600.0:.2f} h" if max_t >= 7200.0 else f"{max_t:.1f} s"
+        factor = latest["achieved_factor"]
+        factor_text = f"×{factor:.0f}" if math.isfinite(factor) else "×—"
+        live_txt.set_text(("NUMERICAL TRIP   " if fault else "") + f"t {sim_time}   {factor_text}")
+        live_txt.set_color(C_SCRAM if fault else MUTED)
+
+        target = latest["rod_target"]
+        dragging = getattr(rod_slider, "drag_active", False)
+        if math.isfinite(target) and not dragging and abs(rod_slider.val - target) > 0.004:
+            set_slider(target)
+
+    return {
+        "fig": fig,
+        "update": update,
+        "widgets": widgets,
+        "state": state,
+        "cycle_optional_chart": cycle_optional_chart,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Offline smoke render (development aid)
+# ---------------------------------------------------------------------------
+
+def synthetic_row(t, **overrides):
+    row = dict(zip(FIELD_NAMES, FIELD_DEFAULTS))
+    row.update({
+        "sim_time_s": t, "n": 1.0, "Tf": 543.0, "Tc": 293.0, "rho": 0.0,
+        "rho_dollars": 0.0, "I_norm": 1.0, "Xe_norm": 1.0, "rho_xe": 0.0,
+        "achieved_factor": 1.0, "rod_position": 0.75, "rod_target": 0.75,
+        "engine_status": 1.0, "target_h_s": 1.0e-4, "step_real_time_s": 2.0e-6,
+        "decay_heat": 0.066, "rho_rod_dollars": 0.02, "rho_fuel_dollars": -0.015,
+        "rho_coolant_dollars": -0.004, "rho_xenon_dollars": -0.001,
+        "critical_rod_position": 0.75, "plant_mode": 0.0, "scram_active": 0.0,
+    })
+    row.update(overrides)
+    return row
+
+
+def run_smoke(dashboard, output_path):
+    for frame in range(900):
+        t = frame * 0.1
+        if t < 15.0:
+            row = synthetic_row(t)
+        else:
+            rise = 1.0 - math.exp(-(t - 15.0) / 12.0)
+            n = 1.0 + 0.32 * rise
+            row = synthetic_row(
+                t, n=n, Tf=543.0 + 55.0 * (n - 1.0), Tc=293.0 + 9.0 * (n - 1.0),
+                rho_dollars=0.22 * math.exp(-(t - 15.0) / 9.0),
+                rod_position=min(0.80, 0.75 + 0.01 * (t - 15.0)), rod_target=0.80,
+                I_norm=1.0 + 0.004 * (t / 90.0), Xe_norm=1.0 - 0.006 * (t / 90.0),
+                rho_rod_dollars=0.09, rho_fuel_dollars=-0.055,
+                rho_coolant_dollars=-0.012, rho_xenon_dollars=0.004,
+                critical_rod_position=0.72 + 0.04 * rise,
+            )
+        data_queue.put(row)
+    dashboard["update"](0)
+    dashboard["fig"].savefig(output_path, dpi=115, facecolor=BG)
+    log(f"Smoke render written to {output_path}")
+
+    for frame in range(400):
+        t = 90.0 + frame * 0.1
+        decay = math.exp(-(t - 90.0) / 1.2)
+        row = synthetic_row(
+            t, n=1.32 * decay + 0.015, Tf=543.0 - 120.0 * (1.0 - decay),
+            Tc=293.0 - 6.0 * (1.0 - decay), rho_dollars=-10.9,
+            rod_position=max(0.0, 0.80 - 0.05 * (t - 90.0)), rod_target=0.0,
+            scram_active=1.0, decay_heat=0.055,
+            rho_rod_dollars=-2.7, rho_fuel_dollars=0.35,
+            rho_coolant_dollars=0.02, rho_xenon_dollars=-0.01,
+            critical_rod_position=0.90,
+        )
+        data_queue.put(row)
+    dashboard["update"](0)
+    scram_path = output_path.replace(".png", "_scram.png")
+    dashboard["fig"].savefig(scram_path, dpi=115, facecolor=BG)
+    log(f"SCRAM smoke render written to {scram_path}")
+
+    dashboard["cycle_optional_chart"]()  # poison -> components
+    dashboard["update"](0)
+    components_path = output_path.replace(".png", "_components.png")
+    dashboard["fig"].savefig(components_path, dpi=115, facecolor=BG)
+    log(f"Components smoke render written to {components_path}")
+
+
+# ---------------------------------------------------------------------------
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Real-Time Reactor Dashboard")
+    parser.add_argument("--source", choices=("serial", "stdout"), default="serial",
+                        help="Input source: serial reads COM/UART, stdout reads CSV lines piped from a process")
     parser.add_argument("--port", default="COM7", help="Serial port (COMx or /dev/ttyUSBx)")
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate")
     parser.add_argument("--power", type=float, default=1.0, help="Initial power fraction")
-    parser.add_argument(
-        "--plot-mode",
-        choices=("sliding", "full"),
-        default="sliding",
-        help="Plot range mode: sliding grows until the window size, full shows all history",
-    )
-    parser.add_argument(
-        "--window",
-        type=parse_duration,
-        default=DEFAULT_WINDOW_SECONDS,
-        help="Sliding window size in simulation seconds, e.g. 21600, 30m, or 6h",
-    )
+    parser.add_argument("--plot-mode", choices=("sliding", "full"), default="sliding",
+                        help="Plot range mode: sliding grows until the window size, full shows all history")
+    parser.add_argument("--window", type=parse_duration, default=DEFAULT_WINDOW_SECONDS,
+                        help="Sliding window size in simulation seconds, e.g. 21600, 30m, or 6h")
+    parser.add_argument("--smoke", metavar="PNG", help=argparse.SUPPRESS)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    source = args.source
     sim_finished.clear()
 
-    if source == "serial":
+    if args.smoke:
+        comm = DummyComm()
+    elif args.source == "serial":
         comm = SerialComm(args.port, args.baud)
     else:
         comm = StdinComm()
@@ -221,704 +1405,36 @@ def main():
         log(f"Error opening connection: {exc}")
         return
 
-    if args.power != 1.0:
+    if args.power != 1.0 and not args.smoke:
         comm.write(f"P {args.power}\n")
 
-    window_seconds = args.window
+    dashboard = build_dashboard(args, comm)
+
+    if args.smoke:
+        run_smoke(dashboard, args.smoke)
+        return
 
     thread = threading.Thread(target=reader_thread, args=(comm,), daemon=True)
     thread.start()
 
-    plt.style.use("dark_background")
-    # Matplotlib defaults bind 'r' to reset the plot view; we use R for SCRAM.
-    plt.rcParams["keymap.home"] = [k for k in plt.rcParams["keymap.home"] if k.lower() != "r"]
-    fig, (ax_power, ax_temp, ax_rho, ax_poison, ax_time) = plt.subplots(
-        5, 1, figsize=(11, 10), sharex=True
-    )
-    fig.suptitle(
-        f"Real-Time Reactor Simulation ({source.upper()} Mode)",
-        fontsize=13,
-        color="white",
-        fontweight="bold",
-    )
-    fig.subplots_adjust(hspace=0.22, top=0.92, bottom=0.08, left=0.10, right=0.65)
-
-    ln_power, = ax_power.plot([], [], color="#FF6B35", lw=2, label="Power (N)")
-    ln_thermal, = ax_power.plot(
-        [], [], color="#FF9F1C", lw=2, linestyle="--", label="Thermal Power"
-    )
-    ax_power.set_ylabel("Power")
-    ax_power.grid(True, alpha=0.2)
-    ax_power.legend(loc="upper left", bbox_to_anchor=(1.01, 1), borderaxespad=0)
-    ax_power.set_xlim(0, INITIAL_X_SECONDS)
-    ax_power.set_ylim(0, 2)
-
-    ln_temp, = ax_temp.plot([], [], color="#00D4FF", lw=2, label="Fuel Temp (°C)")
-    ax_temp.set_ylabel("Temperature (°C)")
-    ln_coolant, = ax_temp.plot([], [], color="#4ECDC4", lw=2, label="Coolant Temp")
-    ax_temp.grid(True, alpha=0.2)
-    ax_temp.legend(loc="upper left", bbox_to_anchor=(1.01, 1), borderaxespad=0)
-    ax_temp.set_ylim(280, 700)
-
-    ln_rho, = ax_rho.plot([], [], color="#7CFC00", lw=2, label="Reactivity ($)")
-    ax_rho.axhline(y=1.0, color="red", linestyle="--", alpha=0.5, label="Prompt Critical")
-    ax_rho.set_ylabel("Reactivity ($)")
-    ax_rho.grid(True, alpha=0.2)
-    ax_rho.legend(loc="upper left", bbox_to_anchor=(1.01, 1), borderaxespad=0)
-    ax_rho.set_ylim(-0.5, 1.5)
-
-    ln_iodine, = ax_poison.plot([], [], color="#FFD166", lw=2, label="I-135 / I0")
-    ln_xenon, = ax_poison.plot([], [], color="#B388FF", lw=2, label="Xe-135 / Xe0")
-    ax_poison.set_ylabel("Poison ratio")
-    ax_poison.grid(True, alpha=0.2)
-    ax_poison.legend(loc="upper left", bbox_to_anchor=(1.01, 1), borderaxespad=0)
-    ax_poison.set_ylim(0.5, 1.5)
-
-    ln_target_h, = ax_time.plot([], [], color="#E040FB", lw=2, label="Target step ($h$)")
-    ln_real_time, = ax_time.plot([], [], color="#00E5FF", lw=2, label="Real step time")
-    ax_time.set_ylabel("Step time (s)")
-    ax_time.set_xlabel("Time (s)")
-    ax_time.grid(True, alpha=0.2)
-    ax_time.legend(loc="upper left", bbox_to_anchor=(1.01, 1), borderaxespad=0)
-    ax_time.set_yscale("log")
-    ax_time.set_ylim(1e-8, 1e-1)
-
-    rod_txt = ax_power.text(
-        0.02,
-        0.85,
-        "Rods: all inserted",
-        transform=ax_power.transAxes,
-        color="lime",
-        fontsize=10,
-        fontweight="bold",
-        bbox=dict(boxstyle="round", facecolor="black", alpha=0.7),
-    )
-    rod_pos_txt = ax_power.text(
-        0.02,
-        0.72,
-        "",
-        transform=ax_power.transAxes,
-        color="yellow",
-        fontsize=9,
-        fontweight="bold",
-        bbox=dict(boxstyle="round", facecolor="black", alpha=0.7),
-    )
-    plant_txt = ax_power.text(
-        0.02,
-        0.59,
-        "Plant: PWR-SMR Passive Safe",
-        transform=ax_power.transAxes,
-        color="#00D4FF",
-        fontsize=9,
-        fontweight="bold",
-        bbox=dict(boxstyle="round", facecolor="black", alpha=0.7),
-    )
-    time_txt = ax_power.text(
-        0.50,
-        0.94,
-        "1x  sim:0.0s",
-        transform=ax_power.transAxes,
-        color="cyan",
-        fontsize=9,
-        ha="center",
-        fontweight="bold",
-        bbox=dict(boxstyle="round", facecolor="black", alpha=0.5),
-    )
-
-    val_power_txt = ax_power.text(
-        1.0, 1.02, "", transform=ax_power.transAxes, color="#FF6B35", ha="right", va="bottom",
-        fontweight="bold", fontsize=9
-    )
-    val_temp_txt = ax_temp.text(
-        1.0, 1.02, "", transform=ax_temp.transAxes, color="#00D4FF", ha="right", va="bottom",
-        fontweight="bold", fontsize=9
-    )
-    val_rho_txt = ax_rho.text(
-        1.0, 1.02, "", transform=ax_rho.transAxes, color="#7CFC00", ha="right", va="bottom",
-        fontweight="bold", fontsize=9
-    )
-    val_poison_txt = ax_poison.text(
-        1.0, 1.02, "", transform=ax_poison.transAxes, color="#B388FF", ha="right", va="bottom",
-        fontweight="bold", fontsize=9
-    )
-    val_time_txt = ax_time.text(
-        1.0, 1.02, "", transform=ax_time.transAxes, color="#00E5FF", ha="right", va="bottom",
-        fontweight="bold", fontsize=9
-    )
-    reactivity_txt = ax_rho.text(
-        0.02,
-        0.05,
-        "",
-        transform=ax_rho.transAxes,
-        color="#7CFC00",
-        fontsize=8.5,
-        fontweight="bold",
-        bbox=dict(boxstyle="round", facecolor="black", alpha=0.75),
-    )
-
-    plant_names = {
-        0: "PWR-SMR Passive Safe",
-        1: "RBMK-like Demonstrator",
-        2: "TMI-inspired Cooling Loss",
-    }
-    plant_colors = {0: "#00D4FF", 1: "#FF6B35", 2: "#FFD166"}
-
-    times = []
-    powers = []
-    thermal_powers = []
-    temps = []
-    coolants = []
-    rhos_dollars = []
-    iodine_ratios = []
-    xenon_ratios = []
-    target_hs = []
-    real_step_times = []
-    rhos_rod = []
-    rhos_fuel = []
-    rhos_coolant = []
-    rhos_xenon = []
-    critical_rods = []
-    rod_position_display = 0.75
-    rod_target_display = 0.75
-    scram_state_display = False
-    active_plant_mode_display = 0
-
-    def update_plant_label():
-        name = plant_names.get(active_plant_mode_display, "Unknown")
-        plant_txt.set_text(f"Plant: {name}")
-        plant_txt.set_color(plant_colors.get(active_plant_mode_display, "#FFFFFF"))
-
-    def update_rod_display(position=None, target=None, scram_active=None):
-        nonlocal rod_position_display, rod_target_display, scram_state_display
-
-        if position is not None:
-            rod_position_display = position
-        if target is not None:
-            rod_target_display = target
-        if scram_active is not None:
-            scram_state_display = bool(scram_active)
-
-        if scram_state_display:
-            rod_txt.set_text("SCRAM ACTIVE\nTrip reset required before restart")
-            rod_txt.set_color("yellow")
-        elif rod_position_display == 0.0 and rod_target_display == 0.0:
-            rod_txt.set_text("SCRAM CLEARED\nWithdraw rods to restart")
-            rod_txt.set_color("cyan")
-        else:
-            rod_txt.set_text(f"Rod target: {rod_target_display * 100:.1f}% withdrawn")
-            rod_txt.set_color("red")
-        rod_pos_txt.set_text(f"Rod pos: {rod_position_display * 100:.1f}%")
-
-    update_rod_display()
-
-    def drain_data_queue():
-        while True:
-            try:
-                data_queue.get_nowait()
-            except queue.Empty:
-                break
-
-    def clear_plot_data():
-        times.clear()
-        powers.clear()
-        thermal_powers.clear()
-        temps.clear()
-        coolants.clear()
-        rhos_dollars.clear()
-        iodine_ratios.clear()
-        xenon_ratios.clear()
-        target_hs.clear()
-        real_step_times.clear()
-        rhos_rod.clear()
-        rhos_fuel.clear()
-        rhos_coolant.clear()
-        rhos_xenon.clear()
-        critical_rods.clear()
-        update_plant_label()
-
-        for line in (
-            ln_power,
-            ln_thermal,
-            ln_temp,
-            ln_coolant,
-            ln_rho,
-            ln_iodine,
-            ln_xenon,
-            ln_target_h,
-            ln_real_time,
-        ):
-            line.set_data([], [])
-        for txt in (val_power_txt, val_temp_txt, val_rho_txt, val_poison_txt, val_time_txt, reactivity_txt):
-            txt.set_text("")
-        ax_power.set_xlim(0, INITIAL_X_SECONDS)
-        ax_power.set_ylim(0, 2)
-        ax_temp.set_xlim(0, INITIAL_X_SECONDS)
-        ax_temp.set_ylim(280, 700)
-        ax_rho.set_xlim(0, INITIAL_X_SECONDS)
-        ax_rho.set_ylim(-0.5, 1.5)
-        ax_poison.set_xlim(0, INITIAL_X_SECONDS)
-        ax_poison.set_ylim(0.5, 1.5)
-        ax_time.set_xlim(0, INITIAL_X_SECONDS)
-        ax_time.set_ylim(1e-8, 1e-1)
-
-    def reset_power(power_fraction):
-        drain_data_queue()
-        clear_plot_data()
-        comm.write(f"P {power_fraction}\n")
-        fig.canvas.draw_idle()
-
-    def scram():
-        comm.write("R\n")
-        update_rod_display(position=0.0, target=0.0, scram_active=1.0)
-
-    def clear_scram():
-        comm.write("K\n")
-        update_rod_display(scram_active=0.0)
-
-    def set_rod_target(value):
-        try:
-            target = max(0.0, min(1.0, float(value)))
-        except ValueError:
-            return
-        comm.write(f"W {target}\n")
-        update_rod_display(target=target)
-
-    def move_rod_target(delta):
-        comm.write("+\n" if delta > 0 else "-\n")
-
-    def on_key(event):
-        key = event.key
-        try:
-            if key in ("r", "R"):
-                scram()
-            elif key in ("k", "K"):
-                clear_scram()
-            elif key in ("p", "P"):
-                reset_power(power_box.text)
-            elif key in ("up", "+", "="):
-                move_rod_target(0.01)
-            elif key in ("down", "-", "_"):
-                move_rod_target(-0.01)
-        except Exception:
-            pass
-
-    ui_widgets = []
-
-    button_bg = "#263241"
-    button_hover = "#344457"
-    action_bg = "#1E5E8C"
-    action_hover = "#2675AD"
-    scram_bg = "#8B1E2D"
-    scram_hover = "#B3293C"
-    clear_scram_bg = "#1A5F5A"
-    clear_scram_hover = "#248780"
-    rod_bg = "#5C4A16"
-    rod_hover = "#80661D"
-    text = "#F2F5F8"
-    muted = "#AAB4C0"
-
-    def style_button(button, color=button_bg, hover=button_hover, size=8):
-        button.color = color
-        button.hovercolor = hover
-        button.label.set_color(text)
-        button.label.set_fontsize(size)
-        button.label.set_fontweight("bold")
-        button.ax.set_facecolor(color)
-        for spine in button.ax.spines.values():
-            spine.set_edgecolor("#4B5563")
-
-    def style_textbox(box, size=8):
-        box.ax.set_facecolor(text)
-        box.label.set_color(muted)
-        box.label.set_fontsize(size)
-        box.text_disp.set_color("#000000")
-        box.text_disp.set_fontsize(size)
-        if hasattr(box, "cursor"):
-            box.cursor.set_color("#000000")
-        for spine in box.ax.spines.values():
-            spine.set_edgecolor("#4B5563")
-
-    def style_radio(radio, size=8):
-        radio.ax.set_facecolor("#E9EEF5")
-        for label in radio.labels:
-            label.set_color("#111827")
-            label.set_fontsize(size)
-        for spine in radio.ax.spines.values():
-            spine.set_edgecolor("#4B5563")
-
-    # Layout configuration helper
-    def update_layout():
-        left = 0.10
-        right = 0.65
-        width = right - left
-        bottom = 0.08
-        top = 0.92
-        total_height = top - bottom
-
-        is_time_visible = ax_time.get_visible()
-
-        active_axes = [ax_power, ax_temp, ax_rho, ax_poison]
-        if is_time_visible:
-            active_axes.append(ax_time)
-
-        N = len(active_axes)
-        S = 0.035 if N == 5 else 0.045
-        H = (total_height - (N - 1) * S) / N
-
-        for idx, ax in enumerate(active_axes):
-            y_bottom = top - (idx + 1) * H - idx * S
-            ax.set_position([left, y_bottom, width, H])
-            ax.set_visible(True)
-
-            is_bottom = (idx == N - 1)
-            ax.tick_params(labelbottom=is_bottom)
-            if is_bottom:
-                ax.set_xlabel("Time (s)")
-            else:
-                ax.set_xlabel("")
-
-        if not is_time_visible:
-            ax_time.set_visible(False)
-
-        fig.canvas.draw_idle()
-
-    # Define Section Header helper
-    def add_section_header(text, y_pos):
-        fig.text(
-            0.81,
-            y_pos,
-            text,
-            color=muted,
-            fontsize=8,
-            fontweight="bold",
-            ha="left",
-            va="bottom",
-        )
-
-    # 1. EMERGENCY Section
-    add_section_header("SAFETY", 0.895)
-    ax_scram_btn = fig.add_axes([0.81, 0.84, 0.16, 0.045])
-    scram_btn = Button(ax_scram_btn, "SCRAM")
-    style_button(scram_btn, scram_bg, scram_hover, size=9)
-    scram_btn.on_clicked(lambda event: scram())
-    ui_widgets.append(scram_btn)
-
-    ax_clear_scram_btn = fig.add_axes([0.81, 0.79, 0.16, 0.04])
-    clear_scram_btn = Button(ax_clear_scram_btn, "Clear SCRAM")
-    style_button(clear_scram_btn, clear_scram_bg, clear_scram_hover, size=9)
-    clear_scram_btn.on_clicked(lambda event: clear_scram())
-    ui_widgets.append(clear_scram_btn)
-
-    # 2. CONTROL ROD Section
-    add_section_header("CONTROL ROD", 0.765)
-    ax_rod_target_box = fig.add_axes([0.81, 0.71, 0.16, 0.045])
-    rod_target_box = TextBox(ax_rod_target_box, "Rod", initial="0.75")
-    style_textbox(rod_target_box)
-    ui_widgets.append(rod_target_box)
-
-    ax_rod_target_btn = fig.add_axes([0.81, 0.66, 0.16, 0.04])
-    rod_target_btn = Button(ax_rod_target_btn, "Set Rod")
-    style_button(rod_target_btn, rod_bg, rod_hover)
-    rod_target_btn.on_clicked(lambda event: set_rod_target(rod_target_box.text))
-    ui_widgets.append(rod_target_btn)
-
-    ax_withdraw_btn = fig.add_axes([0.81, 0.605, 0.075, 0.04])
-    withdraw_btn = Button(ax_withdraw_btn, "Withdraw")
-    style_button(withdraw_btn, rod_bg, rod_hover, size=7)
-    withdraw_btn.on_clicked(lambda event: move_rod_target(0.01))
-    ui_widgets.append(withdraw_btn)
-
-    ax_insert_btn = fig.add_axes([0.895, 0.605, 0.075, 0.04])
-    insert_btn = Button(ax_insert_btn, "Insert")
-    style_button(insert_btn, rod_bg, rod_hover, size=7)
-    insert_btn.on_clicked(lambda event: move_rod_target(-0.01))
-    ui_widgets.append(insert_btn)
-
-    # 3. SIM SPEED & dt Section
-    add_section_header("SIM SPEED & dt", 0.58)
-    ax_mode = fig.add_axes([0.81, 0.45, 0.16, 0.12])
-    mode_radio = RadioButtons(ax_mode, ("M0 Real", "M1 Train", "M2 Xenon"), active=0)
-    style_radio(mode_radio)
-
-    def set_mode(label):
-        if label.startswith("M0"):
-            comm.write("M0\n")
-        elif label.startswith("M1"):
-            comm.write("M1\n")
-        elif label.startswith("M2"):
-            comm.write("M2\n")
-
-    mode_radio.on_clicked(set_mode)
-    ui_widgets.append(mode_radio)
-
-    ax_toggle_btn = fig.add_axes([0.81, 0.40, 0.16, 0.04])
-    toggle_btn = Button(ax_toggle_btn, "Show dt Graph")
-    style_button(toggle_btn)
-    
-    def toggle_time_plot(event):
-        is_visible = ax_time.get_visible()
-        ax_time.set_visible(not is_visible)
-        toggle_btn.label.set_text("Hide dt Graph" if not is_visible else "Show dt Graph")
-        update_layout()
-
-    toggle_btn.on_clicked(toggle_time_plot)
-    ui_widgets.append(toggle_btn)
-
-    # 4. PLANT PRESETS Section
-    add_section_header("PLANT PRESETS", 0.37)
-    ax_plant = fig.add_axes([0.81, 0.24, 0.16, 0.12])
-    plant_radio = RadioButtons(ax_plant, ("PWR-SMR", "RBMK-like", "TMI-loss"), active=0)
-    style_radio(plant_radio)
-
-    def set_plant(label):
-        nonlocal active_plant_mode_display
-        if label == "PWR-SMR":
-            comm.write("C0\n")
-            active_plant_mode_display = 0
-        elif label == "RBMK-like":
-            comm.write("C1\n")
-            active_plant_mode_display = 1
-        elif label == "TMI-loss":
-            comm.write("C2\n")
-            active_plant_mode_display = 2
-        drain_data_queue()
-        clear_plot_data()
-        fig.canvas.draw_idle()
-
-    plant_radio.on_clicked(set_plant)
-    ui_widgets.append(plant_radio)
-
-    # 5. POWER RESET Section
-    add_section_header("POWER RESET", 0.20)
-    ax_power_box = fig.add_axes([0.81, 0.14, 0.16, 0.045])
-    power_box = TextBox(ax_power_box, "Power", initial=f"{args.power:.2f}")
-    style_textbox(power_box)
-    ui_widgets.append(power_box)
-
-    ax_power_btn = fig.add_axes([0.81, 0.09, 0.16, 0.04])
-    power_btn = Button(ax_power_btn, "Reset P")
-    style_button(power_btn, action_bg, action_hover)
-    power_btn.on_clicked(lambda event: reset_power(power_box.text))
-    ui_widgets.append(power_btn)
-
-    # Initialize layout and hide ax_time by default
-    ax_time.set_visible(False)
-    update_layout()
-
-    fig.canvas.mpl_connect("key_press_event", on_key)
-
-    def update(frame):
-        nonlocal active_plant_mode_display
-
-        while not data_queue.empty():
-            try:
-                parts_tuple = data_queue.get_nowait()
-                (
-                    t,
-                    power,
-                    temp,
-                    _rho,
-                    dollars,
-                    coolant,
-                    iodine,
-                    xenon,
-                    _rho_xe,
-                    tc_factor,
-                    rod_position,
-                    rod_target,
-                    engine_status,
-                    target_h,
-                    real_step_time,
-                    decay_heat,
-                    plant_mode,
-                    rho_rod_dlr,
-                    rho_fuel_dlr,
-                    rho_coolant_dlr,
-                    rho_xenon_dlr,
-                    rod_critical,
-                    scram_active,
-                ) = parts_tuple
-
-                if t is not None and times and t < times[-1]:
-                    clear_plot_data()
-
-                if plant_mode is not None:
-                    active_plant_mode_display = int(plant_mode)
-                if decay_heat is None:
-                    decay_heat = 0.0
-
-                times.append(t)
-                powers.append(power)
-                # Grouped decay heat owns 6.6% of equilibrium thermal power.
-                thermal_powers.append(0.934 * power + decay_heat)
-                temps.append(temp)
-                coolants.append(coolant if coolant is not None else float("nan"))
-                rhos_dollars.append(dollars)
-                target_hs.append(max(1e-9, target_h) if target_h is not None else float("nan"))
-                real_step_times.append(
-                    max(1e-9, real_step_time) if real_step_time is not None else float("nan")
-                )
-                rhos_rod.append(rho_rod_dlr)
-                rhos_fuel.append(rho_fuel_dlr)
-                rhos_coolant.append(rho_coolant_dlr)
-                rhos_xenon.append(rho_xenon_dlr)
-                critical_rods.append(rod_critical)
-
-                if tc_factor is not None:
-                    status_suffix = (
-                        "  NUMERICAL TRIP" if engine_status is not None and engine_status <= 0
-                        else ""
-                    )
-                    time_txt.set_text(
-                        f"{tc_factor:.0f}x  sim:{t:.1f}s{status_suffix}"
-                    )
-                if rod_position is not None and rod_target is not None:
-                    update_rod_display(position=rod_position, target=rod_target, scram_active=scram_active)
-                if iodine is not None and xenon is not None:
-                    iodine_ratios.append(iodine)
-                    xenon_ratios.append(xenon)
-                else:
-                    iodine_ratios.append(float("nan"))
-                    xenon_ratios.append(float("nan"))
-            except queue.Empty:
-                break
-
-        if not times:
-            return (
-                ln_power,
-                ln_thermal,
-                ln_temp,
-                ln_coolant,
-                ln_rho,
-                ln_iodine,
-                ln_xenon,
-                ln_target_h,
-                ln_real_time,
-            )
-
-        update_plant_label()
-
-        max_t = times[-1]
-        if args.plot_mode == "sliding":
-            if max_t <= window_seconds:
-                window_start = 0.0
-                window_end = min(window_seconds, max(INITIAL_X_SECONDS, max_t + 10))
-            else:
-                window_start = max_t - window_seconds
-                window_end = max_t
-            visible_start = bisect_left(times, window_start)
-        else:
-            window_start = 0.0
-            window_end = max_t + 10 if max_t > ax_power.get_xlim()[1] * 0.9 else ax_power.get_xlim()[1]
-            visible_start = 0
-
-        visible_times = times[visible_start:]
-        visible_powers = powers[visible_start:]
-        visible_thermal_powers = thermal_powers[visible_start:]
-        visible_temps = temps[visible_start:]
-        visible_coolants = coolants[visible_start:]
-        visible_rhos = rhos_dollars[visible_start:]
-        visible_iodine_ratios = iodine_ratios[visible_start:]
-        visible_xenon_ratios = xenon_ratios[visible_start:]
-        visible_target_hs = target_hs[visible_start:]
-        visible_real_step_times = real_step_times[visible_start:]
-
-        ln_power.set_data(visible_times, visible_powers)
-        ln_thermal.set_data(visible_times, visible_thermal_powers)
-        ln_temp.set_data(visible_times, visible_temps)
-        ln_coolant.set_data(visible_times, visible_coolants)
-        ln_rho.set_data(visible_times, visible_rhos)
-        ln_iodine.set_data(visible_times, visible_iodine_ratios)
-        ln_xenon.set_data(visible_times, visible_xenon_ratios)
-        ln_target_h.set_data(visible_times, visible_target_hs)
-        ln_real_time.set_data(visible_times, visible_real_step_times)
-
-        val_power_txt.set_text(f"N: {powers[-1]:.4f}  Thermal: {thermal_powers[-1]:.4f}")
-        val_temp_txt.set_text(f"Tf: {temps[-1]:.1f}°C  Tc: {coolants[-1]:.1f}°C")
-        val_rho_txt.set_text(f"Rho: {rhos_dollars[-1]:.4f} $")
-        if iodine_ratios and math.isfinite(iodine_ratios[-1]):
-            val_poison_txt.set_text(f"I: {iodine_ratios[-1]:.3f}  Xe: {xenon_ratios[-1]:.3f}")
-        if real_step_times and math.isfinite(real_step_times[-1]):
-            val_time_txt.set_text(f"dt_real: {real_step_times[-1]:.2e} s")
-        if rhos_rod:
-            def component_text(value):
-                return f"{value:+.4f} $" if math.isfinite(value) else "N/A"
-
-            reactivity_txt.set_text(
-                f"Rho Rod: {component_text(rhos_rod[-1])}\n"
-                f"Rho Fuel: {component_text(rhos_fuel[-1])}\n"
-                f"Rho Cool: {component_text(rhos_coolant[-1])}\n"
-                f"Rho Xe: {component_text(rhos_xenon[-1])}\n"
-                f"Rho Total: {rhos_dollars[-1]:+.4f} $\n"
-                f"Crit Rod: {critical_rods[-1]*100:.2f}%"
-            )
-
-        ax_power.set_xlim(window_start, window_end)
-        ax_time.set_xlim(window_start, window_end)
-
-        valid_powers = [v for v in visible_thermal_powers if math.isfinite(v)]
-        if valid_powers:
-            max_p = max(valid_powers)
-            ax_power.set_ylim(0, max(2.0, max_p * 1.3))
-
-        valid_temps = [v for v in chain(visible_temps, visible_coolants) if math.isfinite(v)]
-        if valid_temps:
-            min_temp = min(valid_temps)
-            max_temp = max(valid_temps)
-            ax_temp.set_ylim(min_temp - 20, max_temp * 1.1)
-
-        max_d = max(visible_rhos)
-        min_d = min(visible_rhos)
-        margin = max(0.5, (max_d - min_d) * 0.3)
-        ax_rho.set_ylim(min_d - margin, max_d + margin)
-
-        valid_poisons = [
-            v for v in chain(visible_iodine_ratios, visible_xenon_ratios) if math.isfinite(v)
-        ]
-        if valid_poisons:
-            max_poison = max(valid_poisons)
-            min_poison = min(valid_poisons)
-            poison_margin = max(0.05, (max_poison - min_poison) * 0.25)
-            ax_poison.set_ylim(min_poison - poison_margin, max_poison + poison_margin)
-
-        valid_times = [
-            v
-            for v in chain(visible_target_hs, visible_real_step_times)
-            if math.isfinite(v) and v > 0
-        ]
-        if valid_times:
-            max_time_val = max(valid_times)
-            min_time_val = min(valid_times)
-            ax_time.set_ylim(min_time_val * 0.5, max_time_val * 2.0)
-
-        return (
-            ln_power,
-            ln_thermal,
-            ln_temp,
-            ln_coolant,
-            ln_rho,
-            ln_iodine,
-            ln_xenon,
-            ln_target_h,
-            ln_real_time,
-        )
-
-    ani = FuncAnimation(fig, update, interval=50, blit=False, cache_frame_data=False)
-
-    log("\n=== Real-Time Reactor Plotter ===")
-    log(f"Source: {source.upper()}")
-    if source == "serial":
+    animation = FuncAnimation(dashboard["fig"], dashboard["update"], interval=50,
+                              blit=False, cache_frame_data=False)
+
+    log("\n=== Real-Time Reactor Dashboard ===")
+    log(f"Source: {args.source.upper()}")
+    if args.source == "serial":
         log(f"Port: {args.port} @ {args.baud}")
     log("\nControls:")
-    log("  [Up/+] Withdraw rod target")
-    log("  [Down/-] Insert rod target")
-    log("  [R]    SCRAM (insert all)")
-    log("  [K]    Clear SCRAM (Reset Trip)")
-    log("  [P]    Reinitialize at a power fraction")
+    log("  [R]       SCRAM")
+    log("  [K]       Clear SCRAM")
+    log("  [P]       Reset at the power in the box")
+    log("  [Space]   Pause / resume display")
+    log("  [D]       Cycle poison / ρ components / step-time chart")
+    log("  [Up/+]    Withdraw rod target 1%")
+    log("  [Down/-]  Insert rod target 1%")
     plt.show()
 
-    # Keep the animation alive for GUI backends that require a live reference.
-    _ = ani
+    _ = animation
     sim_finished.set()
     comm.close()
 
