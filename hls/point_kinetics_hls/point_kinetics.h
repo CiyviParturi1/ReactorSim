@@ -108,6 +108,7 @@ void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cm
     float set_rod_target_cmd, float rod_target_cmd, int plant_mode_cmd,
     float plant_mode_update_cmd, float *target_h_out,
     float *decay_heat_out, float *plant_mode_out,
-    float clear_scram_cmd, float *scram_active_out);
+    float clear_scram_cmd, float *scram_active_out,
+    float set_source_q_cmd, float source_q_cmd, float *source_q_out);
 
 #endif

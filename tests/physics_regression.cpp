@@ -24,7 +24,7 @@ struct DoubleState {
     std::array<double, SIZE> value;
 };
 
-DoubleState derivative(const DoubleState& state, const pk::ReactorParams& params, const pk::PlantConfig& cfg, double tf_ref, double tc_ref, double rod_position) {
+DoubleState derivative(const DoubleState& state, const pk::ReactorParams& params, const pk::PlantConfig& cfg, double tf_ref, double tc_ref, double rod_position, double source_q) {
     DoubleState result = {};
     const int n_index = 0;
     const int c_index = 1;
@@ -35,15 +35,17 @@ DoubleState derivative(const DoubleState& state, const pk::ReactorParams& params
     const double n = state.value[n_index];
     const double tf = state.value[tf_index];
     const double tc = state.value[tc_index];
-    const double rho_rod = cfg.rho_rod_min + rod_position * (cfg.rho_rod_max - cfg.rho_rod_min);
-    const double rho = rho_rod + cfg.alpha_f * (tf - tf_ref) + cfg.alpha_c * (tc - tc_ref);
+    const double two_pi = 6.283185307179586;
+    const double worth = rod_position - std::sin(two_pi * rod_position) / two_pi;
+    const double rho = cfg.rho_rod_min + worth * (cfg.rho_rod_max - cfg.rho_rod_min)
+                       + cfg.alpha_f * (tf - tf_ref) + cfg.alpha_c * (tc - tc_ref);
 
     double delayed_source = 0.0;
     for (int i = 0; i < pk::PRECURSOR_GROUPS; ++i) {
         delayed_source += params.lam_i[i] * state.value[c_index + i];
         result.value[c_index + i] = (params.beta_i[i] / params.Lambda) * n - params.lam_i[i] * state.value[c_index + i];
     }
-    result.value[n_index] = ((rho - params.beta_total) / params.Lambda) * n + delayed_source + params.Q;
+    result.value[n_index] = ((rho - params.beta_total) / params.Lambda) * n + delayed_source + source_q;
 
     double decay_heat = 0.0;
     for (int i = 0; i < pk::DECAY_GROUPS; ++i) {
@@ -57,21 +59,21 @@ DoubleState derivative(const DoubleState& state, const pk::ReactorParams& params
     return result;
 }
 
-void rk4_step(DoubleState& state, const pk::ReactorParams& params, const pk::PlantConfig& cfg, double tf_ref, double tc_ref, double rod_position, double h) {
-    const DoubleState k1 = derivative(state, params, cfg, tf_ref, tc_ref, rod_position);
+void rk4_step(DoubleState& state, const pk::ReactorParams& params, const pk::PlantConfig& cfg, double tf_ref, double tc_ref, double rod_position, double source_q, double h) {
+    const DoubleState k1 = derivative(state, params, cfg, tf_ref, tc_ref, rod_position, source_q);
     DoubleState temporary = state;
     for (int i = 0; i < DoubleState::SIZE; ++i) {
         temporary.value[i] = state.value[i] + 0.5 * h * k1.value[i];
     }
-    const DoubleState k2 = derivative(temporary, params, cfg, tf_ref, tc_ref, rod_position);
+    const DoubleState k2 = derivative(temporary, params, cfg, tf_ref, tc_ref, rod_position, source_q);
     for (int i = 0; i < DoubleState::SIZE; ++i) {
         temporary.value[i] = state.value[i] + 0.5 * h * k2.value[i];
     }
-    const DoubleState k3 = derivative(temporary, params, cfg, tf_ref, tc_ref, rod_position);
+    const DoubleState k3 = derivative(temporary, params, cfg, tf_ref, tc_ref, rod_position, source_q);
     for (int i = 0; i < DoubleState::SIZE; ++i) {
         temporary.value[i] = state.value[i] + h * k3.value[i];
     }
-    const DoubleState k4 = derivative(temporary, params, cfg, tf_ref, tc_ref, rod_position);
+    const DoubleState k4 = derivative(temporary, params, cfg, tf_ref, tc_ref, rod_position, source_q);
     for (int i = 0; i < DoubleState::SIZE; ++i) {
         state.value[i] += (h / 6.0) * (k1.value[i] + 2.0 * k2.value[i] + 2.0 * k3.value[i] + k4.value[i]);
     }
@@ -192,6 +194,55 @@ void test_all_numerical_faults_latch_scram() {
            "non-finite precursor state must be sanitized");
 }
 
+void test_rod_worth_curve() {
+    for (int mode = 0; mode < pk::PLANT_MODES; ++mode) {
+        const pk::PlantConfig cfg = pk::plant_config(mode);
+        expect( near(pk::rod_rho(0.0f, cfg), cfg.rho_rod_min, 1.0e-6), "S-curve worth must keep the inserted endpoint");
+        expect( near(pk::rod_rho(1.0f, cfg), cfg.rho_rod_max, 1.0e-6), "S-curve worth must keep the withdrawn endpoint");
+
+        float previous = pk::rod_rho(0.0f, cfg);
+        for (int step_index = 1; step_index <= 20; ++step_index) {
+            const float current = pk::rod_rho(step_index / 20.0f, cfg);
+            expect( current > previous, "S-curve worth must be strictly increasing along travel");
+            previous = current;
+        }
+
+        const float slope_mid = pk::rod_rho(0.51f, cfg) - pk::rod_rho(0.49f, cfg);
+        const float slope_end = pk::rod_rho(0.99f, cfg) - pk::rod_rho(0.97f, cfg);
+        expect( slope_mid > 3.0f * slope_end, "differential worth must peak mid-bank");
+
+        const float span = cfg.rho_rod_max - cfg.rho_rod_min;
+        const float targets[] = {
+            0.0f, 0.25f, 0.50f, 0.75f, 1.0f
+        };
+        for (float share : targets) {
+            const float wanted = cfg.rho_rod_min + share * span;
+            const float position = pk::rod_position_for_rho(wanted, cfg);
+            expect( position >= 0.0f && position <= 1.0f, "worth inversion must stay inside rod travel");
+            expect( near(pk::rod_rho(position, cfg), wanted, 1.0e-5), "worth inversion must recover the requested reactivity");
+        }
+    }
+}
+
+void test_external_source_equilibrium() {
+    pk::ReactorParams params;
+    pk::ReactorState state;
+    pk::reset(state, params, 1.0f, 0);
+    expect(state.source_q == 0.0f, "reset must clear the external source");
+
+    state.source_q = 1.0e-4f;
+    pk::set_rod_target(state, 0.0f);
+    for (int frame = 0; frame < 40; ++frame) {
+        pk::advance(state, params, PK_MAX_H, PK_MAX_SUBSTEPS);
+    }
+    const pk::PlantConfig cfg = pk::plant_config(0);
+    const double steady_rho = pk::total_rho(state, cfg);
+    expect( steady_rho < 0.0f, "inserted rods must keep a sourced core subcritical");
+    expect( state.n > 0.0f, "the external source must sustain positive power");
+    const double expected_n = -params.Lambda * state.source_q / steady_rho;
+    expect( near(state.n, expected_n, 2.0e-2 * expected_n), "source-driven equilibrium must satisfy n = Lambda*Q/|rho|");
+}
+
 void test_against_double_rk4() {
     pk::ReactorParams params;
     const pk::PlantConfig cfg = pk::plant_config(0);
@@ -203,7 +254,7 @@ void test_against_double_rk4() {
     DoubleState reference = to_double_state(float_state);
     const double reference_h = 1.0e-5;
     for (int i = 0; i < 1000000; ++i) {
-        rk4_step( reference, params, cfg, float_state.Tf_ref, float_state.Tc_ref, 0.80, reference_h);
+        rk4_step( reference, params, cfg, float_state.Tf_ref, float_state.Tc_ref, 0.80, 0.0, reference_h);
     }
     for (int i = 0; i < 100000; ++i) {
         pk::step(float_state, params, PK_BASE_H);
@@ -223,6 +274,8 @@ int main() {
     expect(PK_MAX_H == 2.0e-3f, "canonical maximum timestep changed unexpectedly");
     expect(PK_MAX_SUBSTEPS == 100000, "canonical substep cap changed unexpectedly");
     test_equilibrium_resets();
+    test_rod_worth_curve();
+    test_external_source_equilibrium();
     test_long_duration_clock();
     test_poison_precision();
     test_decay_heat_curve();

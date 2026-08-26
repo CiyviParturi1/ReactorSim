@@ -49,9 +49,12 @@ static int test_hls_top() {
 
     float clear_scram_cmd = 0.0f;
     float scram_active_out = 0.0f;
+    float source_q_out = 0.0f;
 
     point_kinetics_step(h, 1, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, &t_out, &n_out, &tf_out, &tc_out, &iodine_out, &xenon_out, &rho_out, &dollars_out, &rho_xe_out, &rod_position_out, &rod_target_out,
-                        &tc_factor_out, &engine_order_out, c_out, 0.0f, 0.0f, 0, 0.0f, &target_h_out, &decay_heat_out, &plant_mode_out, clear_scram_cmd, &scram_active_out);
+                        &tc_factor_out, &engine_order_out, c_out, 0.0f, 0.0f, 0, 0.0f, &target_h_out, &decay_heat_out, &plant_mode_out, clear_scram_cmd, &scram_active_out,
+                        1.0f, 0.001f, &source_q_out);
+    failures += expect(fabs(source_q_out - 0.001f) < 1.0e-8f, "HLS top applies and echoes the external source command");
 
     failures += expect(isfinite(t_out), "HLS top time output is finite");
     failures += expect(isfinite(n_out), "HLS top neutron output is finite");
@@ -80,14 +83,15 @@ static int test_hls_top() {
 #endif
 
     point_kinetics_step(frame_h, frame_substeps, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, &t_out, &n_out, &tf_out, &tc_out, &iodine_out, &xenon_out, &rho_out, &dollars_out, &rho_xe_out,
-                        &rod_position_out, &rod_target_out, &tc_factor_out, &engine_order_out, c_out, 0.0f, 0.0f, 0, 0.0f, &target_h_out, &decay_heat_out, &plant_mode_out, 0.0f, &scram_active_out);
+                        &rod_position_out, &rod_target_out, &tc_factor_out, &engine_order_out, c_out, 0.0f, 0.0f, 0, 0.0f, &target_h_out, &decay_heat_out, &plant_mode_out, 0.0f, &scram_active_out,
+                        0.0f, 0.0f, &source_q_out);
 
 #ifdef POINT_KINETICS_LONG_TEST
     float prev_t = t_out;
     for (int frame = 0; frame < 250; ++frame) {
         point_kinetics_step(frame_h, frame_substeps, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, &t_out, &n_out, &tf_out, &tc_out, &iodine_out, &xenon_out, &rho_out, &dollars_out, &rho_xe_out,
                             &rod_position_out, &rod_target_out, &tc_factor_out, &engine_order_out, c_out, 0.0f, 0.0f, 0, 0.0f, &target_h_out, &decay_heat_out, &plant_mode_out,
-                            0.0f, &scram_active_out);
+                            0.0f, &scram_active_out, 0.0f, 0.0f, &source_q_out);
         failures += expect(t_out > prev_t, "HLS top time advances beyond float substep precision limit");
         prev_t = t_out;
     }

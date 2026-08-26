@@ -64,7 +64,8 @@ void run_chernobyl_case(const fs::path& output, int mode, bool legacy_shutdown) 
     const int substeps = 1000; // 0.1 simulated seconds per row.
     const pk::PlantConfig cfg = pk::plant_config(mode);
     const float inserted_rho = 2.5e-3f;
-    const float target_delta = inserted_rho / (cfg.rho_rod_max - cfg.rho_rod_min);
+    const float start_worth = pk::rod_rho(state.rod_position, cfg);
+    const float target_delta = pk::rod_position_for_rho(start_worth + inserted_rho, cfg) - state.rod_position;
 
     for (int frame = 0; frame < 1200; ++frame) {
         std::string event;

@@ -108,6 +108,13 @@ void run_simulation_host(ReactorSim& sim, float wall_output_interval) {
                         sim.tc.set_custom(factor);
                         std::cerr << "[TIME] Custom requested=" << sim.tc.factor << "x  h=" << sim.tc.h() << "s\n";
                     }
+                } else if (code == 'S' || code == 's') {
+                    std::istringstream stream(command.substr(1));
+                    float source = 0.0f;
+                    if (stream >> source && pk::finite(source)) {
+                        sim.source_q = pk::clamp(source, 0.0f, PK_SOURCE_Q_MAX);
+                        std::cerr << "[SOURCE] External neutron source set to " << sim.source_q << '\n';
+                    }
                 }
             }
             pending_commands.clear();
@@ -161,7 +168,7 @@ int main() {
     ReactorSim sim;
     std::cerr << "=== Point-Kinetics Reactor Simulator + Time Compression ===\n" << "Equilibrium Iodine : " << sim.I_Xe << '\n' << "Equilibrium Xenon  : " << sim.Xe << "\n\n"
               << "TIME: M0=REALTIME(1x), M1=TRAINING(10x), " "M2=XENON(1000x), T <factor>=CUSTOM\n" << "RESET: P <power>; PLANT: C0=PWR-SMR, " "C1=RBMK-like, C2=TMI-loss\n"
-              << "RODS: +/- adjust target, W <0..1> sets target, R=SCRAM\n" << "Canonical timestep: base=1e-4s, maximum=0.002s; " "output is paced at 10 Hz.\n"
+              << "RODS: +/- adjust target, W <0..1> sets target, R=SCRAM\n" << "SOURCE: S <0..0.01> sets the external neutron source\n" << "Canonical timestep: base=1e-4s, maximum=0.002s; " "output is paced at 10 Hz.\n"
               << "MODEL: grouped decay heat contributes 6.6% at equilibrium; " "prompt thermal " "power contributes 93.4%.\n\n";
     run_simulation_host(sim, PK_WALL_OUTPUT_INTERVAL);
     return 0;

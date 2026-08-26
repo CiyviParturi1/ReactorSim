@@ -42,6 +42,9 @@
 #define PK_XENON_WORTH            -0.020f
 #define PK_SCRAM_EXTRA_RHO        -0.07665f
 
+/* External neutron source (fraction of full power per second of n-units). */
+#define PK_SOURCE_Q_MAX            0.01f
+
 /* Decay heat groups (sum = 0.066). Half-lives: 10 s, 300 s, 15000 s. */
 #define PK_DECAY_FRACTION_0        0.025f
 #define PK_DECAY_FRACTION_1        0.021f

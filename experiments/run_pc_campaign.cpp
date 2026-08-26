@@ -194,7 +194,7 @@ void run_preset_comparison(const fs::path& root) {
         pk::reset(state, params, 1.0f, mode);
         const float initial_target = state.rod_target;
         const pk::PlantConfig cfg = pk::plant_config(mode);
-        const float target_delta = delta_rho / (cfg.rho_rod_max - cfg.rho_rod_min);
+        const float target_delta = pk::rod_position_for_rho( pk::rod_rho(initial_target, cfg) + delta_rho, cfg) - initial_target;
         csv.row(scenario, "reset", state, params, 0.0f, 0, 0.0);
 
         const float h = 1.0e-3f;
@@ -233,7 +233,9 @@ DoubleState derivative(const DoubleState& state, const pk::ReactorParams& params
     const double n = state.value[n_index];
     const double tf = state.value[tf_index];
     const double tc = state.value[tc_index];
-    const double rho_rod = cfg.rho_rod_min + rod_position * (cfg.rho_rod_max - cfg.rho_rod_min);
+    const double two_pi = 6.283185307179586;
+    const double worth = rod_position - std::sin(two_pi * rod_position) / two_pi;
+    const double rho_rod = cfg.rho_rod_min + worth * (cfg.rho_rod_max - cfg.rho_rod_min);
     const double rho = rho_rod + cfg.alpha_f * (tf - tf_ref) + cfg.alpha_c * (tc - tc_ref);
 
     double delayed_source = 0.0;
@@ -243,7 +245,7 @@ DoubleState derivative(const DoubleState& state, const pk::ReactorParams& params
                                    - params.lam_i[i] * state.value[c_index + i];
     }
     result.value[n_index] = ((rho - params.beta_total) / params.Lambda) * n
-                          + delayed_source + params.Q;
+                          + delayed_source;
 
     double decay_heat = 0.0;
     for (int i = 0; i < pk::DECAY_GROUPS; ++i) {

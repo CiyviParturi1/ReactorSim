@@ -864,9 +864,24 @@ def build_dashboard(args, comm):
     style_button(reset_btn, C_BTN, C_BTN_HOVER, size=8)
     widgets.append(reset_btn)
 
-    fig.text(0.802, 0.090,
+    section("NEUTRON SOURCE", 0.100)
+    source_ax = fig.add_axes((0.802, 0.052, 0.078, 0.040))
+    source_box = TextBox(source_ax, "", initial="0.000")
+    source_ax.set_facecolor("#232b36")
+    for spine in source_ax.spines.values():
+        spine.set_edgecolor(PANEL_EDGE)
+    source_box.text_disp.set_color(TEXT)
+    source_box.text_disp.set_fontsize(9)
+    if hasattr(source_box, "cursor"):
+        source_box.cursor.set_color(TEXT)
+    widgets.append(source_box)
+    source_btn = Button(fig.add_axes((0.888, 0.052, 0.082, 0.040)), "Set source")
+    style_button(source_btn, C_BTN, C_BTN_HOVER, size=7)
+    widgets.append(source_btn)
+
+    fig.text(0.802, 0.028,
              "Keys\nR scram  K clear  P reset\nSpace pause  D cycle chart\n↑ ↓ rod ±1%",
-             fontsize=7.2, color=MUTED, linespacing=1.55, va="top")
+             fontsize=6.6, color=MUTED, linespacing=1.35, va="top")
 
     # --- State ----------------------------------------------------------------
     history = {"t": []}
@@ -1102,6 +1117,15 @@ def build_dashboard(args, comm):
         comm.write(f"P {power}\n")
         fig.canvas.draw_idle()
 
+    def set_source(text):
+        try:
+            source = max(0.0, min(0.01, float(text)))
+        except ValueError:
+            return
+        source_box.set_val(f"{source:.4f}")
+        comm.write(f"S {source}\n")
+        fig.canvas.draw_idle()
+
     def set_speed(label):
         comm.write(f"M{('Realtime', 'Training', 'Xenon').index(label.split()[0])}\n")
 
@@ -1146,6 +1170,8 @@ def build_dashboard(args, comm):
     clear_btn.on_clicked(lambda event: clear_scram())
     reset_btn.on_clicked(lambda event: reset_power(power_box.text))
     power_box.on_submit(reset_power)
+    source_btn.on_clicked(lambda event: set_source(source_box.text))
+    source_box.on_submit(set_source)
     speed_radio.on_clicked(set_speed)
     plant_radio.on_clicked(set_plant)
     pause_btn.on_clicked(lambda event: set_pause(not state["paused"]))

@@ -7,6 +7,8 @@
 
 #include "point_kinetics_config.h"
 
+#include <math.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -81,9 +83,36 @@ static inline void pk_c_reference_temperatures(float power_fraction, float *tf_r
     *tf_ref = *tc_ref + (PK_K_HEAT * power) / PK_FUEL_COUPLING;
 }
 
+/* Integral rod worth shape (matches pk::rod_worth_fraction): differential
+ * worth is zero at both travel ends and peaks mid-bank. */
+static inline float pk_c_rod_worth_fraction(float rod_position)
+{
+    float position = pk_c_clamp(rod_position, 0.0f, 1.0f);
+    return position - sinf(6.2831853f * position) / 6.2831853f;
+}
+
 static inline float pk_c_rod_rho(float rod_position, const PkPlantCoeffs *cfg)
 {
-    return cfg->rho_rod_min + rod_position * (cfg->rho_rod_max - cfg->rho_rod_min);
+    return cfg->rho_rod_min + pk_c_rod_worth_fraction(rod_position) * (cfg->rho_rod_max - cfg->rho_rod_min);
+}
+
+/* Rod position whose worth equals the target reactivity (bisection; matches
+ * pk::rod_position_for_rho). Out-of-range targets clamp to the travel ends. */
+static inline float pk_c_rod_position_for_rho(float target, const PkPlantCoeffs *cfg)
+{
+    float lo = 0.0f;
+    float hi = 1.0f;
+    int i;
+
+    for (i = 0; i < 32; ++i) {
+        const float mid = 0.5f * (lo + hi);
+        if (pk_c_rod_rho(mid, cfg) < target) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    return 0.5f * (lo + hi);
 }
 
 /* Rod position that would cancel fuel + coolant + xenon reactivity. */
@@ -93,7 +122,7 @@ static inline float pk_c_critical_rod_position(float Tf, float Tc, float tf_ref,
     const float rho_fuel = cfg->alpha_f * (Tf - tf_ref);
     const float rho_cool = cfg->alpha_c * (Tc - tc_ref);
     const float needed = -rho_fuel - rho_cool - rho_Xe;
-    return pk_c_clamp((needed - cfg->rho_rod_min) / (cfg->rho_rod_max - cfg->rho_rod_min), 0.0f, 1.0f);
+    return pk_c_rod_position_for_rho(needed, cfg);
 }
 
 #ifdef __cplusplus

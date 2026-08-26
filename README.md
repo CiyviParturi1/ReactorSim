@@ -231,17 +231,31 @@ thermal power exactly 1.0 initially. Their state is continuous across SCRAM
 and decays as fission power falls. The reduced groups use 10 s, 300 s, and
 15,000 s half-lives, retaining approximately 1.43% decay heat two hours after
 an instantaneous shutdown. The thermal and feedback equations remain a lumped
-educational model, rod worth is linear, and full rod travel takes 100 simulated
-seconds.
+educational model, rod worth follows a sinusoidal S-curve whose differential
+worth peaks mid-bank, and full rod travel takes 100 simulated seconds.
 
 ### Control Rod Worth Calibration
+- **Shape:** Integral worth is $\rho(x) = \rho_{\min} + (\rho_{\max} -
+  \rho_{\min})\,(x - \sin 2\pi x / 2\pi)$ for normalized position $x$. The
+  endpoints equal the linear baselines below; differential worth is zero at
+  both travel ends and peaks mid-bank.
 - **Baselines:** The educational full-bank limits are `rho_rod_min = -0.020f`
   and `rho_rod_max = +0.0066667f` in Modes 0 and 2. This range can balance the
   complete modeled differential xenon worth at every supported reset power.
 - **Equilibrium:** At full power and reference temperatures, the zero-feedback
-  critical position is **75% withdrawn**. The displayed critical position also
-  includes current xenon and temperature feedback, so it varies during
+  critical position is about **63% withdrawn** in Modes 0 and 2 and about
+  **77% withdrawn** in the RBMK-like Mode 1. The displayed critical position
+  also includes current xenon and temperature feedback, so it varies during
   transients and at other equilibrium power levels.
+
+### External Neutron Source
+- Every reset starts with the source off (`source_q = 0`). The operator can
+  apply a constant external neutron source with the `S <value>` UART/GUI
+  command, clamped to $[0,\ 0.01]$.
+- A subcritical configuration then settles at the source-driven equilibrium
+  $n = \Lambda Q / |\rho|$: indicated power rises hyperbolically as rods are
+  withdrawn toward criticality. This supports subcritical-multiplication,
+  source-range-monitoring, and 1/M critical-position demonstrations.
 
 ### Safety Latching (SCRAM & Reset Trip)
 - **SCRAM:** Applies a permanent, latched emergency shutdown state (`scram_active = true`), adding a safety reactivity penalty of $-10.95\$$ (`-0.07665f`).
@@ -287,6 +301,9 @@ The simulation core solves a coupled system of differential equations describing
 Prompt neutron power $n(t)$ and 6 delayed neutron precursor groups $C_i(t)$:
 $$\frac{dn}{dt} = \frac{\rho(t) - \beta}{L} n(t) + \sum_{i=1}^6 \lambda_i C_i(t) + Q$$
 $$\frac{dC_i}{dt} = \frac{\beta_i}{L} n(t) - \lambda_i C_i(t)$$
+
+$Q$ is the external neutron source: zero after every reset and
+operator-commandable within $[0, 0.01]$ (see *External Neutron Source* above).
 
 #### Thermal Hydraulics (Two-Node Heat Transfer)
 Lumped fuel temperature $T_f(t)$ and coolant temperature $T_c(t)$:

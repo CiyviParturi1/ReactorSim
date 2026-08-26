@@ -12,7 +12,8 @@ void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cm
     float set_rod_target_cmd, float rod_target_cmd, int plant_mode_cmd,
     float plant_mode_update_cmd, float *target_h_out,
     float *decay_heat_out, float *plant_mode_out,
-    float clear_scram_cmd, float *scram_active_out) {
+    float clear_scram_cmd, float *scram_active_out,
+    float set_source_q_cmd, float source_q_cmd, float *source_q_out) {
 #pragma HLS INTERFACE s_axilite port=h bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=substeps bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=tc_factor bundle=CTRL
@@ -44,6 +45,9 @@ void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cm
 #pragma HLS INTERFACE s_axilite port=plant_mode_out bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=clear_scram_cmd bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=scram_active_out bundle=CTRL
+#pragma HLS INTERFACE s_axilite port=set_source_q_cmd bundle=CTRL
+#pragma HLS INTERFACE s_axilite port=source_q_cmd bundle=CTRL
+#pragma HLS INTERFACE s_axilite port=source_q_out bundle=CTRL
 #pragma HLS INTERFACE s_axilite port=return bundle=CTRL
 #pragma HLS ARRAY_PARTITION variable=C_out complete dim=1
 
@@ -74,6 +78,10 @@ void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cm
         pk::reset_scram_trip(state);
     }
 
+    if (pk::finite(set_source_q_cmd) && set_source_q_cmd > 0.5f && pk::finite(source_q_cmd)) {
+        state.source_q = pk::clamp(source_q_cmd, 0.0f, PK_SOURCE_Q_MAX);
+    }
+
     if (!pk::finite(h) || h <= 0.0f) {
         h = pk::TimePolicy::base_h();
     }
@@ -100,6 +108,7 @@ void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cm
     *decay_heat_out = state.decay_heat;
     *plant_mode_out = static_cast<float>(state.plant_mode);
     *scram_active_out = state.scram_active ? 1.0f : 0.0f;
+    *source_q_out = state.source_q;
 
     for (int i = 0; i < pk::PRECURSOR_GROUPS; ++i) {
 #pragma HLS UNROLL

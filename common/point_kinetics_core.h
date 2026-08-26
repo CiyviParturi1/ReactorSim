@@ -10,6 +10,7 @@
  *   I_Xe, Xe   iodine / xenon (normalized to full-power equilibrium)
  *   decay_heat residual heat after fission drops
  *   rods       position 0 = fully inserted, 1 = fully withdrawn
+ *   source_q   external neutron source, zero until commanded
  *
  * How time advances:
  *   step()    one physics substep (kinetics + heat + rods)
@@ -86,7 +87,6 @@ struct TimePolicy {
 struct ReactorParams {
     float Lambda;                         // prompt neutron generation time
     float beta_total;                     // total delayed-neutron fraction
-    float Q;                              // external source (usually 0)
     float lam_i[PRECURSOR_GROUPS];        // precursor decay constants
     float beta_i[PRECURSOR_GROUPS];       // precursor yields
 
@@ -105,7 +105,7 @@ struct ReactorParams {
     float decay_lambda[DECAY_GROUPS];     // decay-group rates
 
     ReactorParams()
-        : Lambda(0.00002f), beta_total(PK_BETA_TOTAL), Q(0.0f),
+        : Lambda(0.00002f), beta_total(PK_BETA_TOTAL),
           // Two-node thermal model at N=1:
           //   Tc ≈ 265 + 10/0.357 ≈ 293 C
           //   Tf ≈ 293 + 10/0.04  ≈ 543 C
@@ -219,6 +219,7 @@ struct ReactorState {
     float rod_position;       // 0 = in, 1 = out
     float rod_target;
     float rod_motion_residual;
+    float source_q;           // external neutron source (operator command)
     int plant_mode;
     bool scram_active;
     bool numerical_fault;
@@ -228,8 +229,19 @@ struct ReactorState {
 // Reactivity pieces (rho). Dollars = rho / beta_total.
 // ---------------------------------------------------------------------------
 
+// Integral rod worth shape: differential worth is zero at both travel ends
+// and peaks mid-bank, so rho(x) = min + span * (x - sin(2*pi*x)/(2*pi)).
+inline float rod_worth_fraction(float position) {
+    const float x = clamp(position, 0.0f, 1.0f);
+    return x - sinf(6.2831853f * x) / 6.2831853f;
+}
+
+inline float rod_rho(float position, const PlantConfig& cfg) {
+    return cfg.rho_rod_min + rod_worth_fraction(position) * (cfg.rho_rod_max - cfg.rho_rod_min);
+}
+
 inline float rod_rho(const ReactorState& state, const PlantConfig& cfg) {
-    return cfg.rho_rod_min + state.rod_position * (cfg.rho_rod_max - cfg.rho_rod_min);
+    return rod_rho(state.rod_position, cfg);
 }
 
 inline float fuel_rho(const ReactorState& state, const PlantConfig& cfg) {
@@ -252,10 +264,26 @@ inline float total_rho(const ReactorState& state, const PlantConfig& cfg) {
     return rho;
 }
 
+// Rod position whose worth equals the target reactivity (bisection; the
+// S-curve is strictly increasing, and out-of-range targets clamp to 0/1).
+inline float rod_position_for_rho(float target, const PlantConfig& cfg) {
+    float lo = 0.0f;
+    float hi = 1.0f;
+    for (int i = 0; i < 32; ++i) {
+        const float mid = 0.5f * (lo + hi);
+        if (rod_rho(mid, cfg) < target) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    return 0.5f * (lo + hi);
+}
+
 // Rod position that would make total rho ≈ 0 at the current temperatures/xenon.
 inline float critical_rod_position(const ReactorState& state, const PlantConfig& cfg) {
     const float needed = -fuel_rho(state, cfg) - coolant_rho(state, cfg) - xenon_rho(state, cfg);
-    return clamp((needed - cfg.rho_rod_min) / (cfg.rho_rod_max - cfg.rho_rod_min), 0.0f, 1.0f);
+    return rod_position_for_rho(needed, cfg);
 }
 
 inline float iodine_ref(const ReactorParams& params) {
@@ -341,9 +369,10 @@ inline void reset(ReactorState& state, const ReactorParams& params, float power_
 
     // Critical rods: cancel xenon so rho starts at ~0 (temps are at ref).
     const float rho_xe = xenon_rho(state, cfg);
-    state.rod_position = clamp((-rho_xe - cfg.rho_rod_min) / (cfg.rho_rod_max - cfg.rho_rod_min), 0.0f, 1.0f);
+    state.rod_position = rod_position_for_rho(-rho_xe, cfg);
     state.rod_target = state.rod_position;
     state.rod_motion_residual = 0.0f;
+    state.source_q = 0.0f;
 
     state.decay_heat = 0.0f;
     for (int i = 0; i < DECAY_GROUPS; ++i) {
@@ -463,7 +492,7 @@ inline void step(ReactorState& state, const ReactorParams& params, float h) {
     const float dTfdt = params.K_heat * thermal_power - params.gamma * (state.Tf - state.Tc);
     const float dTcdt = params.gamma * (state.Tf - state.Tc) - cfg.gamma_c_active * (state.Tc - params.Tm_const);
 
-    state.n = (n_old + h * (sum_lam_C + params.Q)) / n_denom;
+    state.n = (n_old + h * (sum_lam_C + state.source_q)) / n_denom;
     compensated_add(h * dTfdt, state.Tf, state.Tf_compensation);
     compensated_add(h * dTcdt, state.Tc, state.Tc_compensation);
     for (int i = 0; i < PRECURSOR_GROUPS; ++i) {

@@ -23,14 +23,16 @@ struct Outputs {
     float rod_position, rod_target, factor, order, target_h, decay, plant;
     float precursors[6];
     float scram_active;
+    float source_q;
 };
 
 void call_top(float h, int substeps, float reset, float reset_power, float withdraw, float insert, float scram,
               float set_target, float target, int plant, float plant_update,
-              float clear_scram, Outputs& out) {
+              float clear_scram, Outputs& out,
+              float set_source_q = 0.0f, float source_q = 0.0f) {
     point_kinetics_step( h, substeps, 1.0f, reset, reset_power, withdraw, insert, scram, &out.t, &out.n, &out.tf, &out.tc, &out.iodine, &out.xenon,
         &out.rho, &out.dollars, &out.rho_xe, &out.rod_position, &out.rod_target, &out.factor, &out.order, out.precursors, set_target, target, plant, plant_update, &out.target_h,
-        &out.decay, &out.plant, clear_scram, &out.scram_active);
+        &out.decay, &out.plant, clear_scram, &out.scram_active, set_source_q, source_q, &out.source_q);
 }
 
 bool near(float a, float b, float tolerance = 2.0e-5f) {
@@ -178,12 +180,40 @@ int main() {
         }
     }
 
+    // External source: identical subcritical source-driven equilibrium.
+    // The leading reset also re-synchronizes the top's persistent preset.
+    pk::reset(core, params, 1.0f, 0);
+    core.source_q = 1.0e-4f;
+    pk::set_rod_target(core, 0.0f);
+    pk::advance(core, params, 0.002f, 1);
+    call_top(0.002f, 1, 1, 1.0f, 0, 0, 0, 1, 0.0f, 0, 1, 0.0f, out, 1, 1.0e-4f);
+    failures += compare(core, out, "external source setup");
+    for (int frame = 0; frame < 10; ++frame) {
+        pk::advance(core, params, 0.002f, PK_MAX_SUBSTEPS);
+        call_top(0.002f, PK_MAX_SUBSTEPS, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0.0f, out, 1, 1.0e-4f);
+        failures += compare(core, out, "external source frame");
+    }
+    if (!near(out.source_q, core.source_q)) {
+        std::cerr << "FAIL external source: top echo=" << out.source_q << " core=" << core.source_q << '\n';
+        ++failures;
+    }
+    const float steady_rho = pk::total_rho(core, pk::plant_config(0));
+    if (!(steady_rho < 0.0f && near(core.n, -params.Lambda * core.source_q / steady_rho, 2.0e-5f))) {
+        std::cerr << "FAIL external source: power is not the subcritical equilibrium\n";
+        ++failures;
+    }
+
     // Non-finite controls must not poison state or overwrite the rod target.
     const float old_target = core.rod_target;
     call_top(std::numeric_limits<float>::quiet_NaN(), 1, 0, 1, 0, 0, 0,
-             1, std::numeric_limits<float>::infinity(), 2, 0, 0.0f, out);
+             1, std::numeric_limits<float>::infinity(), 2, 0, 0.0f, out,
+             1, std::numeric_limits<float>::quiet_NaN());
     if (!std::isfinite(out.n) || !near(out.rod_target, old_target) || !near(out.target_h, pk::TimePolicy::base_h())) {
         std::cerr << "FAIL non-finite command validation\n";
+        ++failures;
+    }
+    if (!near(out.source_q, core.source_q)) {
+        std::cerr << "FAIL non-finite source command changed the applied source\n";
         ++failures;
     }
 
