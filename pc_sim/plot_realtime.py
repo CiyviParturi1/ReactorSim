@@ -10,13 +10,16 @@ solver and ARM application accept.
 """
 
 import argparse
+import csv
 import math
+import os
 import queue
 import random
 import sys
 import threading
 import time
 from bisect import bisect_left
+from datetime import datetime
 
 import numpy as np
 import matplotlib
@@ -70,6 +73,15 @@ WINDOW_PRESETS = (
 # Merge rapid ±1% rod clicks into one marker after this quiet gap (sim seconds).
 ROD_COALESCE_S = 1.5
 ROD_EVENT_MIN_DELTA = 0.008
+
+# Session captures land in this folder next to the working directory.
+CAPTURE_DIRNAME = "captures"
+
+# Simple threshold alarms evaluated on every newest telemetry row.
+ALARM_DEFS = (
+    ("rho_dollars", lambda v: v >= 0.90, "rho ≥ 0.9$"),
+    ("Tf", lambda v: v >= 800.0, "Tf > 800 °C"),
+)
 
 # ---------------------------------------------------------------------------
 # Theme
@@ -161,13 +173,15 @@ def apply_theme():
         "font.family": "sans-serif",
         "legend.frameon": False,
     })
-    # Free the keys we use for reactor commands (R=SCRAM, K=clear, P=reset, Space=pause).
+    # Free the keys we use for reactor commands (R=SCRAM, K=clear, P=reset,
+    # L=load session; S/E/O are unbound by default).
     for keymap, blocked in (
         ("keymap.home", "r"),
         ("keymap.xscale", "k"),
         ("keymap.pan", "p"),
         ("keymap.fullscreen", "f"),
         ("keymap.quit", "q"),
+        ("keymap.yscale", "l"),
     ):
         plt.rcParams[keymap] = [k for k in plt.rcParams[keymap] if k.lower() != blocked]
     plt.rcParams["keymap.quit"] = [k for k in plt.rcParams["keymap.quit"] if k != " "]
@@ -175,6 +189,32 @@ def apply_theme():
 
 def log(message):
     print(message, file=sys.stderr, flush=True)
+
+
+def _file_dialog(title, save=False, default_name=None):
+    """Native file chooser; returns a path or None. Falls back to None when
+    no GUI toolkit is available (headless runs use the smoke API directly)."""
+    try:
+        from tkinter import Tk, filedialog
+    except ImportError as exc:
+        log(f"File dialog unavailable ({exc}).")
+        return None
+    root = Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    filetypes = (("Session CSV", "*.csv"), ("All files", "*.*"))
+    try:
+        if save:
+            path = filedialog.asksaveasfilename(
+                title=title, defaultextension=".csv",
+                initialfile=default_name or "pk_run.csv",
+                initialdir=CAPTURE_DIRNAME, filetypes=filetypes)
+        else:
+            path = filedialog.askopenfilename(
+                title=title, initialdir=CAPTURE_DIRNAME, filetypes=filetypes)
+    finally:
+        root.destroy()
+    return path or None
 
 
 def parse_duration(value):
@@ -219,12 +259,20 @@ class StdinComm:
 
 
 class SerialComm:
-    """Wrapper for PySerial to communicate with the FPGA/UART."""
+    """Wrapper for PySerial to communicate with the FPGA/UART.
+
+    Drops into a disconnected state on any read/write failure and retries
+    the port every few seconds so a board replug never kills the dashboard.
+    """
+
+    REOPEN_INTERVAL_S = 2.0
 
     def __init__(self, port="COM7", baudrate=115200):
         self.port = port
         self.baudrate = baudrate
         self.ser = None
+        self.connected = False
+        self._last_reopen = 0.0
 
     def open(self):
         try:
@@ -232,7 +280,30 @@ class SerialComm:
         except ImportError as exc:
             raise ImportError("pyserial not installed. Run 'pip install pyserial'") from exc
         self.ser = serial.Serial(self.port, self.baudrate, timeout=1)
+        self.connected = True
         log(f"[SerialComm] Opened port {self.port} at {self.baudrate} baud")
+
+    def _drop(self):
+        if self.ser:
+            try:
+                self.ser.close()
+            except Exception:
+                pass
+        self.ser = None
+        self.connected = False
+
+    def try_reopen(self):
+        if self.connected:
+            return
+        now = time.monotonic()
+        if now - self._last_reopen < self.REOPEN_INTERVAL_S:
+            return
+        self._last_reopen = now
+        try:
+            self.open()
+            log("[SerialComm] Reconnected")
+        except Exception as exc:
+            log(f"[SerialComm] Waiting for {self.port}: {exc}")
 
     def read_line(self):
         if self.ser and self.ser.is_open:
@@ -240,6 +311,7 @@ class SerialComm:
                 return self.ser.readline().decode("utf-8", errors="ignore")
             except Exception as exc:
                 log(f"Serial read error: {exc}")
+                self._drop()
         return ""
 
     def write(self, data):
@@ -248,10 +320,12 @@ class SerialComm:
                 self.ser.write(data.encode("utf-8"))
             except Exception as exc:
                 log(f"Serial write error: {exc}")
+                self._drop()
 
     def close(self):
         if self.ser:
             self.ser.close()
+            self.connected = False
             log("[SerialComm] Port closed.")
 
 
@@ -295,6 +369,63 @@ def parse_telemetry(line):
     return row
 
 
+def read_session_csv(path):
+    """Read a session CSV into (times, table{column: list[float]}), or None."""
+    try:
+        with open(path, newline="") as handle:
+            rows = list(csv.reader(handle))
+    except OSError as exc:
+        log(f"Session read error: {exc}")
+        return None
+    if len(rows) < 2:
+        log("Session file has no data rows.")
+        return None
+    header = [name.strip() for name in rows[0]]
+    if "sim_time_s" not in header:
+        log("Session file lacks a sim_time_s column.")
+        return None
+    times = []
+    table = {name: [] for name in header}
+    for record in rows[1:]:
+        if len(record) != len(header):
+            continue
+        try:
+            t = float(record[header.index("sim_time_s")])
+        except ValueError:
+            continue
+        if not math.isfinite(t):
+            continue
+        times.append(t)
+        for name, text in zip(header, record):
+            try:
+                table[name].append(float(text))
+            except ValueError:
+                table[name].append(NAN)
+    return times, table
+
+
+def load_overlay_csv(path):
+    """Load a saved session CSV as a reference trace for chart overlay.
+
+    Accepts any CSV with a header row containing `sim_time_s` plus at least
+    one known series field (e.g. files written by the dashboard capture).
+    Returns {"label", "t", columns{field: np.ndarray}} or None.
+    """
+    loaded = read_session_csv(path)
+    if loaded is None:
+        return None
+    times, table = loaded
+    columns = {}
+    for field in SERIES_FIELDS:
+        if field in table and field != "sim_time_s":
+            columns[field] = np.asarray(table[field], dtype=float)
+    if not columns:
+        log("Overlay file contains no recognized series fields.")
+        return None
+    label = os.path.splitext(os.path.basename(path))[0]
+    return {"label": label, "t": np.asarray(times, dtype=float), "columns": columns}
+
+
 def reader_thread(comm):
     log("Reader thread started.")
     while not sim_finished.is_set():
@@ -302,6 +433,9 @@ def reader_thread(comm):
         if not line:
             if isinstance(comm, StdinComm):
                 break
+            if isinstance(comm, SerialComm):
+                comm.try_reopen()
+                time.sleep(0.1)
             continue
         line = line.strip()
         if not line or "," not in line or "DATA_START" in line:
@@ -722,6 +856,8 @@ def build_dashboard(args, comm):
              fontweight="bold", color=TEXT)
     source_label = "UART" if args.source == "serial" else "PIPE"
     fig.text(0.052, 0.952, f"source {source_label}", fontsize=8, color=MUTED)
+    alarm_txt = fig.text(0.205, 0.970, "", fontsize=9, color=C_SCRAM,
+                         fontweight="bold", va="center")
     live_txt = fig.text(0.494, 0.965, "", fontsize=9, color=MUTED, ha="right")
 
     # --- Trend charts -------------------------------------------------------
@@ -824,9 +960,18 @@ def build_dashboard(args, comm):
         window_buttons.append(btn)
         widgets.append(btn)
 
-    pause_btn = Button(fig.add_axes((0.802, 0.582, 0.168, 0.036)), "Pause display")
-    style_button(pause_btn, C_BTN, C_BTN_HOVER, size=8)
+    pause_btn = Button(fig.add_axes((0.802, 0.582, 0.056, 0.036)), "Pause")
+    style_button(pause_btn, C_BTN, C_BTN_HOVER, size=6.5)
     widgets.append(pause_btn)
+    save_btn = Button(fig.add_axes((0.862, 0.582, 0.036, 0.036)), "Save")
+    style_button(save_btn, C_BTN, C_BTN_HOVER, size=6.5)
+    widgets.append(save_btn)
+    load_btn = Button(fig.add_axes((0.902, 0.582, 0.036, 0.036)), "Load")
+    style_button(load_btn, C_BTN, C_BTN_HOVER, size=6.5)
+    widgets.append(load_btn)
+    overlay_btn = Button(fig.add_axes((0.942, 0.582, 0.036, 0.036)), "Ref")
+    style_button(overlay_btn, C_BTN, C_BTN_HOVER, size=6.5)
+    widgets.append(overlay_btn)
 
     section("SIMULATION SPEED", 0.548)
     speed_ax = fig.add_axes((0.802, 0.432, 0.168, 0.104))
@@ -879,14 +1024,17 @@ def build_dashboard(args, comm):
     style_button(source_btn, C_BTN, C_BTN_HOVER, size=7)
     widgets.append(source_btn)
 
-    fig.text(0.802, 0.028,
-             "Keys\nR scram  K clear  P reset\nSpace pause  D cycle chart\n↑ ↓ rod ±1%",
-             fontsize=6.6, color=MUTED, linespacing=1.35, va="top")
+    fig.text(0.802, 0.040,
+             "Keys:  R scram  K clear  P reset\n"
+             "Space pause  D cycle  E capture\n"
+             "S save as  L load  O ref  ↑↓ rod",
+             fontsize=6.2, color=MUTED, linespacing=1.3, va="top")
 
     # --- State ----------------------------------------------------------------
     history = {"t": []}
     for field in SERIES_FIELDS:
         history[field] = []
+    rows_log = []  # full-fidelity telemetry rows for session export/reload
     events = []  # list of {"t", "kind", "label"}
     latest = {}
     state = {
@@ -902,11 +1050,16 @@ def build_dashboard(args, comm):
         "scram_ui": False,
         # Pending rod-adjustment burst: coalesce rapid ±1% clicks into one marker.
         "rod_burst": None,  # {"start", "end", "last_t"} or None
+        # Reference overlay trace (dict from load_overlay_csv) or None.
+        "overlay": None,
+        # Currently firing alarm labels.
+        "alarms": set(),
     }
 
     def clear_history():
         for values in history.values():
             values.clear()
+        rows_log.clear()
         events.clear()
         for chart in charts:
             for line in chart["lines"].values():
@@ -1073,14 +1226,133 @@ def build_dashboard(args, comm):
     def set_pause(paused):
         state["paused"] = paused
         if paused:
-            pause_btn.label.set_text("Resume display")
-            style_button(pause_btn, C_BTN_ACTIVE, C_BTN_HOVER, size=8)
+            pause_btn.label.set_text("Resume")
+            style_button(pause_btn, C_BTN_ACTIVE, C_BTN_HOVER, size=7)
             live_txt.set_text("PAUSED")
             live_txt.set_color(ACCENT)
         else:
-            pause_btn.label.set_text("Pause display")
-            style_button(pause_btn, C_BTN, C_BTN_HOVER, size=8)
+            pause_btn.label.set_text("Pause")
+            style_button(pause_btn, C_BTN, C_BTN_HOVER, size=7)
         fig.canvas.draw_idle()
+
+    # --- Capture / reference overlay -----------------------------------------
+    def export_session(dest=None):
+        """Write the full history as CSV plus a PNG snapshot of the dashboard.
+
+        `dest` may be a directory (auto timestamped name) or a full CSV path
+        from the save dialog. Returns the CSV path or None when empty.
+        """
+        if not history["t"]:
+            log("Capture skipped: no telemetry received yet.")
+            return None
+        target = dest or CAPTURE_DIRNAME
+        if os.path.splitext(target)[1].lower() == ".csv":
+            csv_path = target
+            outdir = os.path.dirname(csv_path)
+        else:
+            outdir = target
+            os.makedirs(outdir, exist_ok=True)
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            csv_path = os.path.join(outdir, f"pk_run_{stamp}.csv")
+        fields = list(FIELD_NAMES) + ["thermal"]
+        with open(csv_path, "w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(fields)
+            for row in rows_log:
+                writer.writerow([row.get(name, NAN) for name in fields])
+        png_path = os.path.splitext(csv_path)[0] + ".png"
+        fig.savefig(png_path, dpi=115, facecolor=BG)
+        log(f"Captured session: {csv_path}")
+        log(f"Captured snapshot: {png_path}")
+        return csv_path
+
+    def set_overlay(reference):
+        """Attach or clear a reference trace (dict from load_overlay_csv)."""
+        state["overlay"] = reference
+        for chart in charts:
+            for artist in chart.get("overlay_artists", {}).values():
+                artist.remove()
+            chart["overlay_artists"] = {}
+        if reference is not None:
+            log(f"Overlaying reference: {reference['label']} "
+                f"({len(reference['t'])} rows)")
+        else:
+            log("Overlay cleared.")
+        fig.canvas.draw_idle()
+
+    def pick_overlay_file():
+        path = _file_dialog("Load reference session CSV", save=False)
+        set_overlay(load_overlay_csv(path) if path else None)
+
+    def save_session_as():
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = _file_dialog(f"pk_run_{stamp}.csv", save=True)
+        if path:
+            export_session(path)
+
+    def load_session_dialog():
+        path = _file_dialog("Load session CSV", save=False)
+        if path:
+            load_session(path)
+
+    def load_session(path):
+        """Restore a saved CSV as the dashboard history (paused review view)."""
+        loaded = read_session_csv(path)
+        if loaded is None:
+            return
+        times, table = loaded
+        drain_queue()
+        clear_history()
+        history["t"].extend(times)
+        for field in SERIES_FIELDS:
+            history[field].extend(table.get(field, [NAN] * len(times)))
+
+        # Reconstruct SCRAM / clear / trip markers from the status columns.
+        prev_scram = False
+        prev_fault = False
+        for index, t in enumerate(times):
+            scram_now = (table.get("scram_active", [0.0] * len(times))[index]) >= 0.5
+            fault_now = (table.get("engine_status", [1.0] * len(times))[index]) <= 0.0
+            if scram_now and not prev_scram and not fault_now:
+                record_event(t, "SCRAM", "SCRAM")
+            if prev_scram and not scram_now:
+                record_event(t, "clear", "clear")
+            if fault_now and not prev_fault:
+                record_event(t, "trip", "trip")
+            prev_scram = scram_now
+            prev_fault = fault_now
+
+        latest.clear()
+        for name in FIELD_NAMES:
+            if name in table and table[name]:
+                latest[name] = table[name][-1]
+
+        state["window_all"] = True
+        highlight_window_buttons()
+        set_pause(False)
+        update(0)
+        set_pause(True)
+        log(f"Loaded session {os.path.basename(path)} ({len(times)} rows, paused). "
+            "Incoming telemetry starts a new trace.")
+
+    def update_alarms(row):
+        firing = set()
+        for field, predicate, label in ALARM_DEFS:
+            value = row.get(field, NAN)
+            if math.isfinite(value) and predicate(value):
+                firing.add(label)
+        if firing == state["alarms"]:
+            return
+        for label in firing - state["alarms"]:
+            log(f"ALARM raised: {label}")
+        for label in state["alarms"] - firing:
+            log(f"ALARM cleared: {label}")
+        state["alarms"] = firing
+        if firing:
+            alarm_txt.set_text("⚠ " + "   ".join(sorted(firing)))
+            alarm_txt.set_color(C_SCRAM)
+        else:
+            alarm_txt.set_text("")
 
     # --- Commands ---------------------------------------------------------------
     def set_slider(value):
@@ -1158,6 +1430,14 @@ def build_dashboard(args, comm):
             reset_power(power_box.text)
         elif key == "d":
             cycle_optional_chart()
+        elif key == "e":
+            export_session()
+        elif key == "s":
+            save_session_as()
+        elif key == "l":
+            load_session_dialog()
+        elif key == "o":
+            pick_overlay_file()
         elif key in (" ", "space"):
             set_pause(not state["paused"])
         elif key in ("up", "+", "="):
@@ -1172,6 +1452,9 @@ def build_dashboard(args, comm):
     power_box.on_submit(reset_power)
     source_btn.on_clicked(lambda event: set_source(source_box.text))
     source_box.on_submit(set_source)
+    save_btn.on_clicked(lambda event: save_session_as())
+    load_btn.on_clicked(lambda event: load_session_dialog())
+    overlay_btn.on_clicked(lambda event: pick_overlay_file())
     speed_radio.on_clicked(set_speed)
     plant_radio.on_clicked(set_plant)
     pause_btn.on_clicked(lambda event: set_pause(not state["paused"]))
@@ -1207,6 +1490,8 @@ def build_dashboard(args, comm):
             latest.update(row)
             history["t"].append(t)
             thermal = PROMPT_FRACTION * row["n"] + row["decay_heat"]
+            row["thermal"] = thermal
+            rows_log.append(dict(row))
             for field in SERIES_FIELDS:
                 value = thermal if field == "thermal" else row.get(field, NAN)
                 if field in ("target_h_s", "step_real_time_s") and math.isfinite(value):
@@ -1231,6 +1516,8 @@ def build_dashboard(args, comm):
             crit_txt = "—"
         crit_label.set_text(f"crit {crit_txt}   target {rod_slider.val * 100.0:.1f}%")
 
+        update_alarms(latest)
+
         if state["paused"]:
             return
 
@@ -1253,6 +1540,7 @@ def build_dashboard(args, comm):
             start_index = bisect_left(times, window_start)
         visible_times = times[start_index:]
 
+        overlay = state["overlay"]
         for chart in charts:
             if not chart["visible"]:
                 continue
@@ -1262,6 +1550,21 @@ def build_dashboard(args, comm):
                 values = history[field][start_index:]
                 line.set_data(visible_times, values)
                 finite.extend(v for v in values if math.isfinite(v) and (v > 0 or not chart["spec"].get("log")))
+            if overlay is not None:
+                artists = chart.setdefault("overlay_artists", {})
+                mask = (overlay["t"] >= window_start) & (overlay["t"] <= window_end)
+                for spec in chart["spec"]["series"]:
+                    field, color = spec[0], spec[2]
+                    data = overlay["columns"].get(field)
+                    if data is None or not mask.any():
+                        continue
+                    artist = artists.get(field)
+                    if artist is None:
+                        artist, = ax.plot([], [], color=color, linestyle=":",
+                                          linewidth=1.3, alpha=0.8)
+                        artists[field] = artist
+                    artist.set_data(overlay["t"][mask], data[mask])
+                    finite.extend(v for v in data[mask] if math.isfinite(v) and (v > 0 or not chart["spec"].get("log")))
             ax.set_xlim(window_start, window_end)
             key = chart["spec"]["key"]
             if finite:
@@ -1314,8 +1617,11 @@ def build_dashboard(args, comm):
         sim_time = f"{max_t / 3600.0:.2f} h" if max_t >= 7200.0 else f"{max_t:.1f} s"
         factor = latest["achieved_factor"]
         factor_text = f"×{factor:.0f}" if math.isfinite(factor) else "×—"
-        live_txt.set_text(("NUMERICAL TRIP   " if fault else "") + f"t {sim_time}   {factor_text}")
-        live_txt.set_color(C_SCRAM if fault else MUTED)
+        reconnecting = isinstance(comm, SerialComm) and not comm.connected
+        live_txt.set_text(("NUMERICAL TRIP   " if fault else "")
+                          + f"t {sim_time}   {factor_text}"
+                          + ("   RECONNECTING…" if reconnecting else ""))
+        live_txt.set_color(C_SCRAM if fault else (ACCENT if reconnecting else MUTED))
 
         target = latest["rod_target"]
         dragging = getattr(rod_slider, "drag_active", False)
@@ -1327,7 +1633,12 @@ def build_dashboard(args, comm):
         "update": update,
         "widgets": widgets,
         "state": state,
+        "events": events,
+        "history": history,
         "cycle_optional_chart": cycle_optional_chart,
+        "export_session": export_session,
+        "set_overlay": set_overlay,
+        "load_session": load_session,
     }
 
 
@@ -1396,6 +1707,37 @@ def run_smoke(dashboard, output_path):
     dashboard["fig"].savefig(components_path, dpi=115, facecolor=BG)
     log(f"Components smoke render written to {components_path}")
 
+    # Addition-3 regression: capture round-trip and reference overlay.
+    smoke_dir = os.path.dirname(output_path)
+    csv_path = dashboard["export_session"](dest=smoke_dir)
+    if not csv_path:
+        raise AssertionError("smoke capture produced no CSV")
+    reference = load_overlay_csv(csv_path)
+    assert reference is not None and len(reference["t"]) == 1300, "overlay load lost rows"
+    assert "n" in reference["columns"], "overlay missing power column"
+    dashboard["set_overlay"](reference)
+    dashboard["update"](0)
+    compare_path = output_path.replace(".png", "_compare.png")
+    dashboard["fig"].savefig(compare_path, dpi=115, facecolor=BG)
+    log(f"Overlay comparison render written to {compare_path}")
+    alarm_rows = [synthetic_row(5.0, rho_dollars=0.5), synthetic_row(6.0, rho_dollars=1.2, Tf=850.0)]
+    for row in alarm_rows:
+        data_queue.put(row)
+    dashboard["update"](0)
+    assert dashboard["state"]["alarms"], "threshold alarms did not fire"
+    log(f"Alarms fired as designed: {sorted(dashboard['state']['alarms'])}")
+    dashboard["set_overlay"](None)
+    dashboard["update"](0)
+
+    # Save/load round trip: restore the captured session into the dashboard.
+    dashboard["load_session"](csv_path)
+    assert len(dashboard["history"]["t"]) == 1300, "load_session lost rows"
+    assert dashboard["state"]["paused"], "loaded session must open paused"
+    assert "SCRAM" in {event["kind"] for event in dashboard["events"]}, \
+        "load_session did not reconstruct SCRAM markers"
+    log("Loaded session reconstructed history and SCRAM marker")
+    log("Smoke addition-3 checks passed")
+
 
 # ---------------------------------------------------------------------------
 
@@ -1428,8 +1770,12 @@ def main():
     try:
         comm.open()
     except Exception as exc:
-        log(f"Error opening connection: {exc}")
-        return
+        if isinstance(comm, SerialComm):
+            log(f"[SerialComm] {exc}")
+            log("[SerialComm] Dashboard will keep retrying in the background.")
+        else:
+            log(f"Error opening connection: {exc}")
+            return
 
     if args.power != 1.0 and not args.smoke:
         comm.write(f"P {args.power}\n")
@@ -1456,6 +1802,10 @@ def main():
     log("  [P]       Reset at the power in the box")
     log("  [Space]   Pause / resume display")
     log("  [D]       Cycle poison / ρ components / step-time chart")
+    log("  [E]       Quick-capture session CSV + snapshot to captures/")
+    log("  [S]       Save session as... (choose file)")
+    log("  [L]       Load a saved session (paused review view)")
+    log("  [O]       Overlay a saved session as reference traces")
     log("  [Up/+]    Withdraw rod target 1%")
     log("  [Down/-]  Insert rod target 1%")
     plt.show()

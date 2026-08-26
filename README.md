@@ -205,6 +205,13 @@ The launcher builds `pc_sim/pc_solver.cpp` with a C++17 compiler and starts
 the real-time plotter. A failed build aborts the launch instead of falling back
 to a stale executable.
 
+Dashboard extras: `E` quick-captures the session as CSV + PNG snapshot into
+`captures/`, `S` saves as... (choose file), `L` reloads a saved session into
+the dashboard as a paused review view, and `O` overlays a saved CSV as dashed
+reference traces for PC-vs-FPGA comparisons; serial mode retries the port
+automatically after disconnects (`--port`/`--baud` select COM device and
+baud rate); threshold alarms flag `rho ≥ 0.9$` and `Tf > 800 °C`.
+
 ## Model and timing policy
 
 The PC simulator, native tests, HLS top, and Vitis application use the same

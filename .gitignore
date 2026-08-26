@@ -121,3 +121,4 @@ vitis/pk_app_validation/
 clockInfo.txt
 tight_setup_hold_pins.txt
 vitis/pk_platform/zynq_fsbl/
+captures/
