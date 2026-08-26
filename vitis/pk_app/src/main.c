@@ -2,6 +2,8 @@
 #include "xil_printf.h"
 #include "xgpio.h"
 #include "xil_io.h"
+#include "xscugic.h"
+#include "xil_exception.h"
 #include "xpoint_kinetics_step_hw.h"
 #include "xuartps_hw.h"
 #include "xiltimer.h"
@@ -22,6 +24,12 @@
 #define SW_SCRAM        0x80u
 
 #define PK_BASEADDR     XPAR_POINT_KINETICS_STEP_0_BASEADDR
+
+/* Physics-done signaling: the HLS interrupt pin drives IRQ_F2P; a stale
+ * engine falls back to a visible timeout instead of freezing silently. */
+#define PK_ENGINE_TIMEOUT_S   0.25f
+#define PK_INTC_BASEADDR      XPAR_XSCUGIC_0_BASEADDR
+#define PK_INTERRUPT_ID       XPAR_FABRIC_POINT_KINETICS_STEP_0_INTR
 
 #define PK_AP_CTRL      XPOINT_KINETICS_STEP_CTRL_ADDR_AP_CTRL
 #define PK_H            XPOINT_KINETICS_STEP_CTRL_ADDR_H_DATA
@@ -56,6 +64,8 @@
 #define PK_PLANT_OUT    XPOINT_KINETICS_STEP_CTRL_ADDR_PLANT_MODE_OUT_DATA
 #define PK_CLEAR_SCRAM  XPOINT_KINETICS_STEP_CTRL_ADDR_CLEAR_SCRAM_CMD_DATA
 #define PK_SCRAM_ACTIVE XPOINT_KINETICS_STEP_CTRL_ADDR_SCRAM_ACTIVE_OUT_DATA
+#define PK_SET_SOURCE_Q XPOINT_KINETICS_STEP_CTRL_ADDR_SET_SOURCE_Q_CMD_DATA
+#define PK_SOURCE_Q_CMD XPOINT_KINETICS_STEP_CTRL_ADDR_SOURCE_Q_CMD_DATA
 
 #define MODE_REALTIME_H      PK_BASE_H
 #define MODE_TRAINING_H     (PK_BASE_H * 10.0f)
@@ -78,6 +88,8 @@ typedef struct {
     float rod_target;
     int plant_mode;
     int plant_update;
+    int set_source_q;
+    float source_q;
     float tf_ref;
     float tc_ref;
 } AppState;
@@ -102,6 +114,44 @@ static float u32_to_float(u32 value)
     return cvt.f;
 }
 
+static void poll_uart_commands(AppState *state);
+static float elapsed_seconds(XTime start, XTime end);
+
+static XScuGic pk_interrupt_controller;
+static volatile int pk_done_flag = 0;
+static int pk_interrupts_ready = 0;
+
+static void pk_engine_isr(void *unused)
+{
+    (void)unused;
+    pk_done_flag = 1;
+}
+
+static int pk_setup_interrupts(void)
+{
+    XScuGic_Config *config = XScuGic_LookupConfig(PK_INTC_BASEADDR);
+
+    if ((config == NULL) ||
+        (XScuGic_CfgInitialize(&pk_interrupt_controller, config,
+                               config->CpuBaseAddress) != XST_SUCCESS)) {
+        return 1;
+    }
+    Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_INT,
+                                 (Xil_ExceptionHandler)XScuGic_InterruptHandler,
+                                 &pk_interrupt_controller);
+    /* Rising edge: the HLS done line holds level until the next start. */
+    XScuGic_SetPriorityTriggerType(&pk_interrupt_controller, PK_INTERRUPT_ID,
+                                   0xA0u, 0x3u);
+    if (XScuGic_Connect(&pk_interrupt_controller, PK_INTERRUPT_ID,
+                        (Xil_ExceptionHandler)pk_engine_isr, NULL) != XST_SUCCESS) {
+        return 1;
+    }
+    XScuGic_Enable(&pk_interrupt_controller, PK_INTERRUPT_ID);
+    Xil_ExceptionEnable();
+    pk_interrupts_ready = 1;
+    return 0;
+}
+
 static void set_reference_temperatures(AppState *state)
 {
     pk_c_reference_temperatures( state->reset_power, &state->tf_ref, &state->tc_ref);
@@ -122,10 +172,30 @@ static float pk_read_float(u32 offset)
     return u32_to_float(Xil_In32(PK_BASEADDR + offset));
 }
 
-static void pk_start_and_wait(void)
+static void pk_start_and_wait(AppState *state)
 {
+    XTime wait_start;
+
+    pk_done_flag = 0;
     Xil_Out32(PK_BASEADDR + PK_AP_CTRL, 0x01u);
-    while ((Xil_In32(PK_BASEADDR + PK_AP_CTRL) & 0x02u) == 0u) {
+
+    if (!pk_interrupts_ready) {
+        /* Old bitstream without the wired interrupt: legacy spin. */
+        while ((Xil_In32(PK_BASEADDR + PK_AP_CTRL) & 0x02u) == 0u) {
+        }
+        return;
+    }
+
+    /* Serve operator commands while the engine computes. */
+    XTime_GetTime(&wait_start);
+    while (!pk_done_flag) {
+        poll_uart_commands(state);
+        XTime now;
+        XTime_GetTime(&now);
+        if (elapsed_seconds(wait_start, now) > PK_ENGINE_TIMEOUT_S) {
+            xil_printf("[ENGINE] done timeout; frame results are stale\r\n");
+            return;
+        }
     }
 }
 
@@ -338,6 +408,11 @@ static void apply_command(const char *cmd, AppState *state)
         if (parse_float_arg(cmd + 1, &value) && pk_c_finite(value) && (value >= 1.0f)) {
             set_time_factor(state, value, 0.0f);
         }
+    } else if ((ch == 'S') || (ch == 's')) {
+        if (parse_float_arg(cmd + 1, &value) && pk_c_finite(value) && (value >= 0.0f) && (value <= PK_SOURCE_Q_MAX)) {
+            state->source_q = value;
+            state->set_source_q = 1;
+        }
     }
 }
 
@@ -382,6 +457,10 @@ int main()
     XGpio_Initialize(&gpio, GPIO_BASEADDR);
     XGpio_SetDataDirection(&gpio, GPIO_CHANNEL, 0xFF);
 
+    if (pk_setup_interrupts() != 0) {
+        xil_printf("[ENGINE] interrupt setup failed; using legacy spin-wait\r\n");
+    }
+
     AppState state;
     state.reset_power = 1.0f;
     state.reset = 1;
@@ -393,6 +472,8 @@ int main()
     state.rod_target = 0.0f;
     state.plant_mode = 0;
     state.plant_update = 0;
+    state.set_source_q = 0;
+    state.source_q = 0.0f;
     state.reported_factor = 1.0f;
     set_reference_temperatures(&state);
     set_time_factor(&state, 1.0f, MODE_REALTIME_H);
@@ -442,9 +523,11 @@ int main()
         pk_write_float(PK_ROD_TGT_CMD, state.rod_target);
         pk_write_int(PK_PLANT_MODE, state.plant_mode);
         pk_write_float(PK_PLANT_UPD, state.plant_update ? 1.0f : 0.0f);
+        pk_write_float(PK_SET_SOURCE_Q, state.set_source_q ? 1.0f : 0.0f);
+        pk_write_float(PK_SOURCE_Q_CMD, state.source_q);
 
         XTime_GetTime(&start_time);
-        pk_start_and_wait();
+        pk_start_and_wait(&state);
         XTime_GetTime(&end_time);
 
         float t = pk_read_float(PK_T_OUT);
@@ -491,6 +574,7 @@ int main()
         state.clear_scram_pulse = 0;
         state.set_rod_target = 0;
         state.plant_update = 0;
+        state.set_source_q = 0;
 
         XTime_GetTime(&frame_end_time);
         float frame_elapsed = elapsed_seconds(frame_start_time, frame_end_time);

@@ -120,3 +120,4 @@ vitis/pk_app_validation/
 # Vivado timing-debug scratch files emitted by direct implementation runs
 clockInfo.txt
 tight_setup_hold_pins.txt
+vitis/pk_platform/zynq_fsbl/

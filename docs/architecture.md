@@ -60,7 +60,10 @@ The PC and FPGA paths execute the same `pk::ReactorState` equations from the
 canonical core. The ARM application does not duplicate the physics solver: it
 selects the timestep and substep count, writes commands to the HLS register
 map, waits for completion, reads outputs, and emits telemetry using shared C
-plant helpers.
+plant helpers. Completion is interrupt-driven: the engine's `done` signal
+drives IRQ_F2P, so the ARM serves UART commands while physics computes; a
+250 ms watchdog timeout reports a stalled engine instead of hanging, and a
+legacy spin-wait remains if interrupts are unavailable.
 
 One output frame follows this sequence:
 

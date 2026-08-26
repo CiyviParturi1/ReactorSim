@@ -7,7 +7,7 @@
     "xsaPathInPlatform": "pk_platform/hw/pk.xsa",
     "emulationXsa": "",
     "emulationXsaPathInPlatform": "",
-    "isCustomFSBL": true,
+    "isCustomFSBL": false,
     "fsblPath": "",
     "pmufwElf": "",
     "flow": "EMBEDDED",
@@ -21,30 +21,23 @@
       "linux"
     ],
     "supportedFamily": "zynq",
-    "stdGenHookList": [
-      {
-        "key": "VITIS_SDT_REPO",
-        "value": ""
-      },
-      {
-        "key": "VITIS_SDT_BOARD_DTS",
-        "value": ""
-      },
-      {
-        "key": "VITIS_SDT_INCLUDE_DTS",
-        "value": ""
-      },
-      {
-        "key": "-dt_overlay",
-        "value": "0"
-      },
-      {
-        "key": "custom_dtsi",
-        "value": ""
-      }
-    ],
+    "stdGenHookList": [],
     "componentType": "PLATFORM",
     "domains": [
+      {
+        "name": "zynq_fsbl",
+        "displayName": "zynq_fsbl",
+        "processor": "ps7_cortexa9_0",
+        "cpuType": "cortex-a9",
+        "cpuInstance": "ps7_cortexa9_0",
+        "os": "standalone",
+        "appTemplate": "zynq_fsbl",
+        "isBootDomain": true,
+        "qemuData": "resources/zynq_fsbl/qemu",
+        "qemuArgsFile": "resources/zynq_fsbl/qemu/qemu_args.txt",
+        "pmcQemuArgsFile": "",
+        "isBSPGenReq": false
+      },
       {
         "name": "standalone_ps7_cortexa9_0",
         "displayName": "standalone_ps7_cortexa9_0",
