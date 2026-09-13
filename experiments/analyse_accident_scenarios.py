@@ -210,7 +210,7 @@ def main() -> int:
             "rbmk_peak_time_after_AZ5_s": metrics["chernobyl_rbmk_like"]["peak_n"]["time_s"] - ch_az5,
             "timing_character_match": abs((ch_az5 - ch_test) - 36.0) < 0.001 and abs((ch_shutdown - ch_az5) - 6.0) < 0.001,
             "magnitude_validated": False,
-            "assessment": "Timing is imposed from the historical sequence and the positive-feedback preset produces a rapid rise. The lumped model cannot validate accident magnitude because it has no void fraction, graphite-displacer effect, spatial kinetics, pressure, or structural failure.",
+            "assessment": "The schedule follows the historical sequence, and the positive-feedback preset produces a rapid rise. The lumped model cannot validate accident magnitude because it omits void fraction, graphite-displacer effects, spatial kinetics, pressure, and structural failure.",
         },
         "tmi": {
             "historical_references": [NRC_TMI, NRC_TMI_TIMELINE],
@@ -220,7 +220,7 @@ def main() -> int:
             "scheduled_core_uncovery_s": historical_heatup,
             "scheduled_peak_fuel_temperature_s": metrics["tmi_loss_of_cooling"]["peak_fuel_temperature_C"]["time_s"],
             "scheduled_heatup_timing_match": 6300.0 <= metrics["tmi_loss_of_cooling"]["peak_fuel_temperature_C"]["time_s"] <= 8280.01,
-            "assessment": "The prompt trip, staged cooling degradation, delayed core-uncovery heat-up and recovery after relief-valve isolation are represented as a presentation surrogate. The event timing is imposed; coolant inventory and pressure are not solved.",
+            "assessment": "The schedule prescribes the prompt trip, cooling degradation, core-uncovery heat-up, and recovery after relief-valve isolation. The model does not solve coolant inventory or pressure.",
         },
     }
 
@@ -277,7 +277,11 @@ def main() -> int:
     tmi_pwr_m = metrics["tmi_modern_pwr"]
     report = f"""# PC accident-character simulation results
 
-These are **simplified educational surrogates**, not validated reconstructions or safety analyses. The model contains lumped point kinetics, iodine/xenon, decay heat, two temperatures and rod feedback; it does not model coolant inventory, void fraction, pressure, core coverage, spatial power, graphite displacers or material failure.
+These results come from simplified educational cases. They are not validated
+accident reconstructions or safety analyses. The model includes lumped point
+kinetics, iodine-xenon poisoning, decay heat, two temperatures, and rod
+feedback. It omits coolant inventory, void fraction, pressure, core coverage,
+spatial power, graphite displacers, and material failure.
 
 ## Results
 
@@ -288,8 +292,15 @@ These are **simplified educational surrogates**, not validated reconstructions o
 
 ## Scenario timing and interpretation
 
-- **Chernobyl character:** test start to AZ-5 is {accuracy['chernobyl']['test_to_AZ5_s']:.1f} s and the surrogate negative shutdown insertion is delayed another {accuracy['chernobyl']['AZ5_to_surrogate_shutdown_insertion_s']:.1f} s. C1's positive coolant-temperature feedback produces a continuing rapid rise while C0's prompt SCRAM collapses power. These timings are imposed to mirror the IAEA sequence; accident magnitude is **not validated**.
-- **TMI character:** reactor trip occurs at {tmi_trip:.1f} s, within the NRC 9-12 s range. Cooling degrades at 10 min, the core-uncovery surrogate begins at 1.75 h, and cooling is restored at 2.3 h. These scheduled stages create the intended delayed heat-up and recovery shape for presentation.
+- In the Chernobyl-style case, AZ-5 occurs {accuracy['chernobyl']['test_to_AZ5_s']:.1f} s after the test starts.
+  The model delays negative shutdown insertion by another {accuracy['chernobyl']['AZ5_to_surrogate_shutdown_insertion_s']:.1f} s. Positive
+  coolant-temperature feedback drives C1 upward while C0's prompt SCRAM cuts
+  power. These times follow the IAEA sequence, but the model does not validate
+  the accident magnitude.
+- In the TMI-style case, the reactor trips at {tmi_trip:.1f} s, within the NRC range
+  of 9 to 12 s. Cooling degrades at 10 min, the core-uncovery case begins at
+  1.75 h, and cooling returns at 2.3 h. These prescribed stages produce the
+  delayed heat-up and recovery shown in the figure.
 
 ## Automated checks
 
@@ -300,13 +311,16 @@ These are **simplified educational surrogates**, not validated reconstructions o
         report += f"| {name.replace('_', ' ')} | {'PASS' if passed else 'FAIL'} |\n"
     report += f"""
 
-The TMI core-uncovery stage is a transparent presentation surrogate implemented by reducing fuel-to-coolant coupling; it is not a solved coolant-inventory model. Higher-fidelity work would require coolant level, pressure and relief-flow dynamics. The Chernobyl surrogate similarly schedules its shutdown delay rather than modelling rod/displacer geometry.
+The TMI core-uncovery case reduces fuel-to-coolant coupling. It does not solve
+coolant inventory. A physical treatment would need coolant level, pressure,
+and relief-flow dynamics. The Chernobyl case schedules the shutdown delay
+instead of modelling rod and displacer geometry.
 
 ## References
 
-- IAEA, *INSAG-7: The Chernobyl Accident*: {IAEA_CHERNOBYL}
-- US NRC, *Backgrounder on the Three Mile Island Accident*: {NRC_TMI}
-- US NRC, *Bulletin 79-05A accident timeline*: {NRC_TMI_TIMELINE}
+- [IAEA, *INSAG-7: The Chernobyl Accident*]({IAEA_CHERNOBYL})
+- [US NRC, *Backgrounder on the Three Mile Island Accident*]({NRC_TMI})
+- [US NRC, *Bulletin 79-05A accident timeline*]({NRC_TMI_TIMELINE})
 """
     (results / "summary.md").write_text(report, encoding="utf-8")
     print(f"Wrote {results / 'summary.json'}")

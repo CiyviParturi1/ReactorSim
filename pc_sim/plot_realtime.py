@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Live dashboard for the point-kinetics reactor simulator.
 
-Reads the 23-field telemetry CSV stream (stdin pipe or UART) and renders
-trend charts, a reactor-core schematic (moderator, fuel rods, control rods,
-and a dense power-scaled fission spark field), a telemetry panel, and a reduced
-set of controls. UI commands are emitted on stderr (stdin mode) or written
-to the serial port (serial mode) using the same one-letter protocol the PC
-solver and ARM application accept.
+The dashboard reads the 23-field telemetry CSV stream from stdin or UART. It
+shows trend charts, the reactor core, telemetry, and controls. It sends the
+same one-letter commands accepted by the PC solver and ARM application through
+stderr or the serial port.
 """
 
 import argparse
@@ -1052,7 +1050,7 @@ def build_dashboard(args, comm):
         "rod_burst": None,  # {"start", "end", "last_t"} or None
         # Reference overlay trace (dict from load_overlay_csv) or None.
         "overlay": None,
-        # Currently firing alarm labels.
+        # Active alarm labels.
         "alarms": set(),
     }
 
@@ -1090,9 +1088,8 @@ def build_dashboard(args, comm):
     def flush_rod_burst(at_time=None):
         """Commit a coalesced rod-target change as a single chart marker.
 
-        The vertical line is placed at the *start* of the adjustment burst
-        (first click), where the physics response begins — not at the quiet
-        timeout or the last click.
+        Place the vertical line at the first click, where the physics response
+        begins. Do not place it at the quiet timeout or the last click.
         """
         burst = state["rod_burst"]
         if burst is None:

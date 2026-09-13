@@ -171,7 +171,7 @@
       "rbmk_peak_time_after_AZ5_s": 6.0,
       "timing_character_match": true,
       "magnitude_validated": false,
-      "assessment": "Timing is imposed from the historical sequence and the positive-feedback preset produces a rapid rise. The lumped model cannot validate accident magnitude because it has no void fraction, graphite-displacer effect, spatial kinetics, pressure, or structural failure."
+      "assessment": "The schedule follows the historical sequence, and the positive-feedback preset produces a rapid rise. The lumped model cannot validate accident magnitude because it omits void fraction, graphite-displacer effects, spatial kinetics, pressure, and structural failure."
     },
     "tmi": {
       "historical_references": [
@@ -187,7 +187,7 @@
       "scheduled_core_uncovery_s": 6300.000488,
       "scheduled_peak_fuel_temperature_s": 8280.0,
       "scheduled_heatup_timing_match": true,
-      "assessment": "The prompt trip, staged cooling degradation, delayed core-uncovery heat-up and recovery after relief-valve isolation are represented as a presentation surrogate. The event timing is imposed; coolant inventory and pressure are not solved."
+      "assessment": "The schedule prescribes the prompt trip, cooling degradation, core-uncovery heat-up, and recovery after relief-valve isolation. The model does not solve coolant inventory or pressure."
     }
   },
   "checks": {

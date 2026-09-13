@@ -19,15 +19,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\experiments\run_campaign.p
   -ResultsDirectory experiments\results\chapter7_pc_20260711
 ```
 
-The campaign currently executes:
+The campaign runs:
 
-* four PWR-SMR-like steady-state powers for 300 simulated seconds;
-* rod withdrawal and insertion transients;
-* fast and 7200-second SCRAM/decay-heat responses;
-* a 36-hour post-SCRAM iodine-xenon run using the XENON batching policy;
-* the same `5e-4` reactivity insertion across all three qualitative presets;
-* double-precision RK4 comparison and timestep convergence at the requested steps;
-* 1000 raw physics-kernel timing frames for REALTIME, TRAINING, and XENON modes.
+- four PWR-SMR-like steady-state powers for 300 simulated seconds;
+- rod withdrawal and insertion transients;
+- fast and 7200-second SCRAM and decay-heat responses;
+- a 36-hour post-SCRAM iodine-xenon run using the XENON batching policy;
+- the same `5e-4` reactivity insertion across all three qualitative presets;
+- double-precision RK4 comparison and timestep convergence;
+- 1000 raw physics-kernel timing frames for each timing mode.
 
 The performance factor is labelled **kernel throughput factor**. It measures
 raw physics-kernel work divided by kernel wall time; it is not the complete
@@ -45,11 +45,24 @@ system, compiler flags, numerical settings, target FPGA clock, and hardware
 status. `summary.md` and `summary.json` are derived products; the CSV files are
 the primary evidence.
 
-The following claims remain deliberately out of scope until the board and AMD
-tools are available: measured FPGA execution time, achieved FPGA compression,
-UART reliability, GUI hardware operation, RTL co-simulation, and PC-FPGA parity.
-PC/core-HLS parity is still covered by the existing native test, but it is
-implementation consistency rather than independent physical validation.
+## Benchmark-validation figures
+
+Run the focused benchmark figure workflow from the repository root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\experiments\run_validation_figures.ps1
+```
+
+It reruns the published CATS Table 6a adiabatic Doppler-feedback benchmark and
+the analytic iodine-xenon checks. The CATS output retains every 0.1 ms state
+and overlays eleven published checkpoints on the trajectory. It writes CSV
+evidence and matching Matplotlib figures under
+`experiments/results/benchmark_validation_20260907/figures/feedback_benchmark/`.
+
+This workflow tests the PC model. The separate
+`chapter7_fpga_20260713` campaign contains the physical FPGA timing, UART, and
+PC-to-FPGA parity evidence. PC-to-HLS parity proves implementation consistency,
+not physical model accuracy.
 
 ## Accident-character presentation campaign
 
@@ -75,7 +88,7 @@ definition, metadata, automated consistency checks, SHA-256 checksums, a
 Markdown/JSON summary, and Chernobyl-style and TMI-style comparison graphs.
 All checks must pass or the campaign exits with an error.
 
-These are deliberately qualitative presentation surrogates. The Chernobyl
+These are qualitative presentation surrogates. The Chernobyl
 schedule imposes its AZ-5/shutdown-effect timing. The TMI schedule represents
 coolant loss and core uncovery by staged heat-transfer parameters because the
 shared model does not solve pressure, coolant inventory, boiling, or core level.

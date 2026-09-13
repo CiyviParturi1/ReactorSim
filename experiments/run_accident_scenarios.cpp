@@ -110,9 +110,8 @@ void run_tmi_case(const fs::path& output, int mode) {
         } else if (second == 600) {
             event = loss_case ? "coolant_loss_and_pump_reduction" : "residual_heat_removal_operating";
             if (loss_case) {
-                // Presentation surrogate: reduced fuel-to-coolant heat transfer as
-                // inventory and forced circulation are lost. This is deliberately
-                // scenario-local and does not alter the shared reactor core model.
+                // Reduce fuel-to-coolant heat transfer to represent lost inventory
+                // and forced circulation. This change applies only to this scenario.
                 params.gamma = 0.010f;
             }
         } else if (second == 6300) {

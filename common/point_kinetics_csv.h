@@ -1,10 +1,10 @@
 #ifndef POINT_KINETICS_CSV_H
 #define POINT_KINETICS_CSV_H
 
-/* Safe fixed-point CSV formatting shared by the ARM application and its host test.
+/* The ARM application and its host test share this fixed-point CSV formatter.
  * Define PK_CSV_PRINTF before including this header (xil_printf on ARM, printf
- * in the host regression). Invalid or out-of-range values are emitted as
- * parseable NaN/Inf tokens instead of being converted to an integer.
+ * in the host regression). The formatter emits invalid or out-of-range values
+ * as parseable NaN/Inf tokens instead of converting them to integers.
  */
 
 #include "point_kinetics_c.h"

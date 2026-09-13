@@ -1,45 +1,69 @@
-# Run the documented native regression suites from the repository root.
+# Build and run the native regression suites from the repository root.
 $ErrorActionPreference = "Stop"
-$root = Split-Path -Parent $PSScriptRoot
-Set-Location $root
 
-function Invoke-Suite {
+$root = Split-Path -Parent $PSScriptRoot
+$buildDir = Join-Path $root "build\native-tests"
+$commonFlags = @(
+    "-std=c++17",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Wpedantic",
+    "-Werror"
+)
+
+function Invoke-NativeTarget {
     param(
-        [string]$Name,
-        [string]$Compile,
-        [string]$Exe
+        [Parameter(Mandatory)] [string]$Name,
+        [Parameter(Mandatory)] [string]$OutputName,
+        [Parameter(Mandatory)] [string[]]$Sources,
+        [string[]]$ExtraFlags = @(),
+        [switch]$BuildOnly
     )
+
+    $output = Join-Path $buildDir "$OutputName.exe"
     Write-Host "==> $Name"
-    Invoke-Expression $Compile
+    & g++ @commonFlags @ExtraFlags @Sources -o $output
     if ($LASTEXITCODE -ne 0) {
         throw "Compile failed: $Name"
     }
-    & $Exe
-    if ($LASTEXITCODE -ne 0) {
-        throw "Test failed: $Name"
+
+    if (!$BuildOnly) {
+        & $output
+        if ($LASTEXITCODE -ne 0) {
+            throw "Test failed: $Name"
+        }
     }
 }
 
-Invoke-Suite -Name "HLS smoke test" `
-    -Compile "g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unknown-pragmas hls\point_kinetics_hls\point_kinetics.cpp hls\point_kinetics_hls\tb_point_kinetics.cpp -o hls\point_kinetics_hls\tb_point_kinetics_test.exe" `
-    -Exe ".\hls\point_kinetics_hls\tb_point_kinetics_test.exe"
+Set-Location $root
+New-Item -ItemType Directory -Force $buildDir | Out-Null
 
-Invoke-Suite -Name "PC/HLS parity" `
-    -Compile "g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -Wno-unknown-pragmas hls\point_kinetics_hls\point_kinetics.cpp tests\pc_hls_parity.cpp -o tests\pc_hls_parity.exe" `
-    -Exe ".\tests\pc_hls_parity.exe"
+try {
+    $hlsSource = "hls\point_kinetics_hls\point_kinetics.cpp"
+    $ignoreHlsPragmas = @("-Wno-unknown-pragmas")
 
-Invoke-Suite -Name "Physics regression" `
-    -Compile "g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror tests\physics_regression.cpp -o tests\physics_regression.exe" `
-    -Exe ".\tests\physics_regression.exe"
+    Invoke-NativeTarget "HLS smoke test" "hls_smoke" `
+        @($hlsSource, "hls\point_kinetics_hls\tb_point_kinetics.cpp") $ignoreHlsPragmas
+    Invoke-NativeTarget "PC/HLS parity" "pc_hls_parity" `
+        @($hlsSource, "tests\pc_hls_parity.cpp") $ignoreHlsPragmas
+    Invoke-NativeTarget "PC/HLS fixed-seed fuzz parity" "pc_hls_fuzz_parity" `
+        @($hlsSource, "tests\pc_hls_fuzz_parity.cpp") $ignoreHlsPragmas
+    Invoke-NativeTarget "Physics regression" "physics_regression" `
+        @("tests\physics_regression.cpp")
+    Invoke-NativeTarget "CATS adiabatic Doppler-feedback benchmark" "cats_doppler_feedback" `
+        @("tests\cats_doppler_feedback_benchmark.cpp")
+    Invoke-NativeTarget "Analytic iodine-xenon regression" "poison_analytic" `
+        @("tests\poison_analytic_regression.cpp")
+    Invoke-NativeTarget "ARM CSV formatting regression" "arm_csv_format" `
+        @("tests\arm_csv_format_regression.cpp")
+    Invoke-NativeTarget "PC solver build" "pc_solver" `
+        @("pc_sim\pc_solver.cpp") -BuildOnly
 
-Invoke-Suite -Name "ARM CSV formatting regression" `
-    -Compile "g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror tests\arm_csv_format_regression.cpp -o tests\arm_csv_format_regression.exe" `
-    -Exe ".\tests\arm_csv_format_regression.exe"
-
-Write-Host "==> PC solver build"
-g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror pc_sim\pc_solver.cpp -o tests\pc_solver_build_test.exe
-if ($LASTEXITCODE -ne 0) {
-    throw "Compile failed: PC solver build"
+    Write-Host "All native suites passed."
 }
-
-Write-Host "All native suites passed."
+finally {
+    if (Test-Path $buildDir) {
+        Remove-Item -LiteralPath $buildDir -Recurse -Force
+    }
+}

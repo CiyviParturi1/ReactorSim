@@ -1,7 +1,7 @@
 #include "point_kinetics.h"
 
-/* * FPGA entry point. State is static so it survives between AXI calls.
- * Flow: apply commands → advance physics → write outputs.
+/* FPGA entry point. State is static so it survives between AXI calls.
+ * Each call applies commands, advances the physics, and writes the outputs.
  */
 void point_kinetics_step( float h, int substeps, float tc_factor, float reset_cmd, float reset_power,
     float withdraw_cmd, float insert_cmd, float scram_cmd,

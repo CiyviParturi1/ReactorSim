@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Capture and analyse physical ZedBoard Chapter 7 evidence.
 
-The script deliberately does not program the board.  It records the exact
-artifacts selected for a manual Vitis programming session, captures the live
-UART stream, and produces machine-readable acceptance evidence from it.
+The script does not program the board. It records the artifacts selected for
+a manual Vitis session, captures the UART stream, and writes the acceptance
+results.
 """
 
 from __future__ import annotations
@@ -98,9 +98,13 @@ def init_results(args: argparse.Namespace) -> int:
     write_json(output / "metadata.json", metadata)
     (output / "README.md").write_text(
         "# Chapter 7 physical ZedBoard results\n\n"
-        "This directory is generated before programming. Keep raw UART logs, "
-        "telemetry CSV, command timelines, photographs, screenshots, and the "
-        "programming log here. `metadata.json` fingerprints the selected image.\n",
+        "This directory stores one board campaign. `metadata.json` identifies "
+        "the board image and software artifacts. Each test folder keeps the "
+        "original UART stream, capture settings, malformed-line record, and "
+        "validation result. The UART text cannot be recreated by a PC test.\n\n"
+        "Parsed telemetry and command-timeline CSV files are derived files and "
+        "remain ignored by Git. The summary, parity reports, and figures contain "
+        "the results used in Chapter 7.\n",
         encoding="utf-8",
     )
     print(f"Created {output}")
@@ -158,7 +162,7 @@ def validate_rows(rows: list[dict[str, str]], capture: dict[str, Any] | None = N
     times = [row["sim_time_s"] for row in values]
     host_times = [float(row["host_monotonic_s"]) for row in rows]
     restart_indices = [index for index, (a, b) in enumerate(zip(times, times[1:])) if b <= a]
-    # A fresh Vitis Run deliberately restarts simulated time. Analyse the most
+    # A fresh Vitis run restarts simulated time. Analyse the most
     # recent continuous execution epoch, while retaining the reset as evidence.
     analysis_start = restart_indices[-1] + 1 if restart_indices else 0
     analysis_values = values[analysis_start:]
@@ -524,11 +528,11 @@ def campaign_summary(args: argparse.Namespace) -> int:
     write_json(results_dir / "summary.json", summary)
     lines = [
         "# Chapter 7 physical ZedBoard results", "",
-        "This report is derived only from recorded UART evidence in this directory.", "",
+        "Recorded UART data in this directory produced this report.", "",
         "## Physical acceptance matrix", "", markdown_table(acceptance, ["test", "rows", "latest_epoch_rows", "restarts", "DATA_START", "23_fields", "finite", "monotonic_time", "engine_valid", "malformed", "missed_frames"]), "",
         "## Measured FPGA execution and compression", "", markdown_table(timing, ["test", "frames", "achieved_factor_mean", "host_observed_factor_mean", "substep_min_s", "substep_mean_s", "substep_median_s", "substep_p95_s", "substep_max_s", "frame_p95_s", "missed_frames"]), "",
         "## Hardware iodine-xenon run", "", markdown_table([xenon] if xenon else [], ["duration_after_scram_h", "iodine_at_xenon_peak", "maximum_xenon_ratio", "xenon_peak_time_h", "maximum_xenon_worth_dollars", "return_within_1pct_h", "maximum_critical_rod_position"]), "",
-        "## PC-FPGA parity", "", f"Recorded parity reports: {len(parity_reports)}.", "",
+        "## PC-to-FPGA parity", "", f"Recorded parity reports: {len(parity_reports)}.", "",
         markdown_table(parity_summary, ["report", "pass", "points", "worst_rmse", "worst_max_abs"]),
     ]
     if xenon_file and make_xenon_plot(xenon_file, results_dir / "figures" / "hardware_xenon.png"):

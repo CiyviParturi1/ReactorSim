@@ -1,7 +1,7 @@
 #ifndef POINT_KINETICS_CONFIG_H
 #define POINT_KINETICS_CONFIG_H
 
-/* * Shared constants for PC, HLS, and ARM.
+/* Shared constants for PC, HLS, and ARM.
  * Keep timing here so the host cannot ask for a step size the core rejects.
  */
 

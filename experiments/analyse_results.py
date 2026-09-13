@@ -382,7 +382,9 @@ def main() -> int:
     lines = [
         "# Chapter 7 PC campaign results",
         "",
-        "All values below were computed from the raw CSV files in this directory. The PC campaign does not establish FPGA hardware execution, UART reliability, GUI hardware operation, or PC-FPGA parity.",
+        "The raw CSV files in this directory produced the values below.\n"
+        "This PC campaign does not measure FPGA execution, UART reliability, "
+        "GUI hardware operation, or PC-to-FPGA parity.",
         "",
         "## Steady-state tests",
         "",
@@ -390,7 +392,8 @@ def main() -> int:
         "",
         "## Rod-transient phase summary",
         "",
-        "The disturbance extremum is measured during 20–80 s. The recovery extremum is measured after the rod target is restored at 80 s.",
+        "The disturbance extremum is measured from 20 to 80 s.\n"
+        "The recovery extremum is measured after the rod target returns at 80 s.",
         "",
         markdown_table(summary["rod_transients"], ["file", "disturbance_extremum", "disturbance_power", "disturbance_time_s", "recovery_extremum", "recovery_power", "recovery_time_s", "final_power"]),
         "",
@@ -404,7 +407,8 @@ def main() -> int:
         "",
         "## სამი რეაქტორული წინასწარი კონფიგურაციის პასუხი ერთნაირ რეაქტიულობის ზემოქმედებაზე",
         "",
-        "This is a complete preset-behaviour comparison. It includes both the presets’ feedback coefficients and their different active cooling-removal conditions; it is not an isolation of temperature-feedback coefficients.",
+        "This comparison includes each preset's feedback coefficients and "
+        "cooling-removal conditions.\nIt does not isolate temperature feedback.",
         "",
         markdown_table(summary["preset_comparison"], ["file", "peak_power", "time_to_peak_s", "max_fuel_temperature", "max_coolant_temperature", "final_power"]),
         "",
@@ -414,21 +418,24 @@ def main() -> int:
         "",
         "## PC physics-kernel performance",
         "",
-        "The reported factor is kernel throughput factor: raw physics-kernel work divided by measured kernel wall time. It excludes pacing, GUI rendering, communication, and deliberate waiting. No 100 ms deadlines were missed in 1000 frames per mode, so the PC kernel can sustain the requested 1×, 10×, and 1000× operating modes.",
+        "The kernel throughput factor divides simulated physics time by measured "
+        "kernel wall time.\nIt excludes pacing, GUI rendering, communication, and "
+        "waiting. No 100 ms deadline was missed in 1000 frames per mode, so the "
+        "PC kernel sustained the requested 1x, 10x, and 1000x modes.",
         "",
         markdown_table(summary["performance"], ["mode", "frames", "mean_frame_time_s", "median_frame_time_s", "std_frame_time_s", "p95_frame_time_s", "max_frame_time_s", "mean_kernel_throughput_factor", "missed_100ms_deadlines"]),
         "",
-        "## Hardware/HLS work still pending",
+        "## Evidence outside this PC campaign",
         "",
         "| Item | Status |",
         "|---|---|",
         "| HLS C simulation | Covered by the native smoke and parity tests |",
-        "| HLS synthesis and Vivado implementation | Pending: Vivado/Vitis are not available in this PC session |",
-        "| RTL co-simulation | Pending tool run |",
-        "| ZedBoard execution time and compression | Pending hardware testing |",
-        "| UART framing/endurance | Pending hardware testing |",
-        "| GUI hardware operation | Pending hardware testing |",
-        "| PC-FPGA parity | Pending hardware testing |",
+        "| HLS synthesis and Vivado implementation | Recorded by the board-independent FPGA validation workflow |",
+        "| RTL co-simulation | Not measured by this campaign |",
+        "| ZedBoard execution time and compression | See the physical ZedBoard campaign |",
+        "| UART framing/endurance | See the physical ZedBoard campaign |",
+        "| GUI hardware operation | Not measured by this campaign |",
+        "| PC-to-FPGA parity | See the physical ZedBoard campaign |",
     ]
     (input_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     make_plots(input_dir, input_dir / "figures")

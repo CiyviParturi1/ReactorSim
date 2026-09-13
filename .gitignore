@@ -11,6 +11,9 @@ Desktop.ini
 *~
 .vscode/
 .idea/
+.cursor/
+.agents/
+.codex/
 __pycache__/
 *.py[cod]
 .venv/

@@ -97,7 +97,9 @@ def main() -> int:
     lines = [
         "# HLS IP register-map validation",
         "",
-        f"Status: **{checks['status']}**",
+        "## Result",
+        "",
+        f"**{checks['status']}**",
         "",
         f"Generated headers compared: {len(header_paths)}",
         f"Canonical register count: {len(canonical)}",

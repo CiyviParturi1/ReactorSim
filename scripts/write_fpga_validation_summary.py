@@ -123,7 +123,7 @@ def main() -> int:
     md = [
         "# Board-independent FPGA validation",
         "",
-        f"Source commit: `{data['source_commit']}`; source tree dirty: `{data['source_tree_dirty']}`",
+        f"Source commit `{data['source_commit']}`. Source tree dirty: `{data['source_tree_dirty']}`.",
         "",
         "| Evidence group | Result | Key result |",
         "|---|---|---|",
@@ -134,10 +134,10 @@ def main() -> int:
         f"| Vivado implementation | **PASS** | WNS {vivado_metrics.get('setup_wns_ns')} ns; WHS {vivado_metrics.get('hold_whs_ns')} ns; 100 MHz closed |",
         f"| Vitis platform/application | **{data['vitis_application']['status']}** | clean standalone BSP and `pk_app_clean.elf` linked |",
         "",
-        f"Post-implementation resources: {util.get('lut')} LUT, {util.get('ff')} FF, {util.get('dsp')} DSP, {util.get('bram_tiles')} BRAM tiles.",
-        f"Clock sweep: 8 ns / 125 MHz closed (WNS {sweep_8.get('wns_ns')} ns); 7 ns / 142.86 MHz failed (WNS {sweep_7.get('wns_ns')} ns).",
+        f"The implemented design uses {util.get('lut')} LUT, {util.get('ff')} FF, {util.get('dsp')} DSP, and {util.get('bram_tiles')} BRAM tiles.",
+        f"The 8 ns clock closed at 125 MHz with WNS {sweep_8.get('wns_ns')} ns. The 7 ns clock failed at 142.86 MHz with WNS {sweep_7.get('wns_ns')} ns.",
         "",
-        "Physical-board execution, measured time compression, UART/GPIO endurance, GUI communication, physical PC-FPGA parity, and sustained ZedBoard operation remain pending hardware testing.",
+        "This workflow does not test physical-board execution, measured time compression, UART or GPIO endurance, GUI communication, PC-to-FPGA parity, or sustained ZedBoard operation.",
     ]
     (out / "summary.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print(json.dumps(data, indent=2))

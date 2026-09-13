@@ -1,6 +1,6 @@
 # Chapter 7 physical ZedBoard results
 
-This report is derived only from recorded UART evidence in this directory.
+Recorded UART data in this directory produced this report.
 
 ## Physical acceptance matrix
 
@@ -43,7 +43,7 @@ This report is derived only from recorded UART evidence in this directory.
 | 36.02803038194445 | 0.466073 | 1.503229 | 7.389139323055556 | -1.4378571428571427 | 20.805805989722224 | 0.857886 |
 
 
-## PC-FPGA parity
+## PC-to-FPGA parity
 
 Recorded parity reports: 6.
 

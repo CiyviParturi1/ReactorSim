@@ -1,6 +1,10 @@
 # PC accident-character simulation results
 
-These are **simplified educational surrogates**, not validated reconstructions or safety analyses. The model contains lumped point kinetics, iodine/xenon, decay heat, two temperatures and rod feedback; it does not model coolant inventory, void fraction, pressure, core coverage, spatial power, graphite displacers or material failure.
+These results come from simplified educational cases. They are not validated
+accident reconstructions or safety analyses. The model includes lumped point
+kinetics, iodine-xenon poisoning, decay heat, two temperatures, and rod
+feedback. It omits coolant inventory, void fraction, pressure, core coverage,
+spatial power, graphite displacers, and material failure.
 
 ## Results
 
@@ -11,8 +15,15 @@ These are **simplified educational surrogates**, not validated reconstructions o
 
 ## Scenario timing and interpretation
 
-- **Chernobyl character:** test start to AZ-5 is 36.0 s and the surrogate negative shutdown insertion is delayed another 6.0 s. C1's positive coolant-temperature feedback produces a continuing rapid rise while C0's prompt SCRAM collapses power. These timings are imposed to mirror the IAEA sequence; accident magnitude is **not validated**.
-- **TMI character:** reactor trip occurs at 12.0 s, within the NRC 9-12 s range. Cooling degrades at 10 min, the core-uncovery surrogate begins at 1.75 h, and cooling is restored at 2.3 h. These scheduled stages create the intended delayed heat-up and recovery shape for presentation.
+- In the Chernobyl-style case, AZ-5 occurs 36.0 s after the test starts. The
+  model delays negative shutdown insertion by another 6.0 s. Positive
+  coolant-temperature feedback drives C1 upward while C0's prompt SCRAM cuts
+  power. These times follow the IAEA sequence, but the model does not validate
+  the accident magnitude.
+- In the TMI-style case, the reactor trips at 12.0 s, within the NRC range of
+  9 to 12 s. Cooling degrades at 10 min, the core-uncovery case begins at 1.75
+  h, and cooling returns at 2.3 h. These prescribed stages produce the delayed
+  heat-up and recovery shown in the figure.
 
 ## Automated checks
 
@@ -34,10 +45,13 @@ These are **simplified educational surrogates**, not validated reconstructions o
 | tmi cooling restoration returns below 300C | PASS |
 
 
-The TMI core-uncovery stage is a transparent presentation surrogate implemented by reducing fuel-to-coolant coupling; it is not a solved coolant-inventory model. Higher-fidelity work would require coolant level, pressure and relief-flow dynamics. The Chernobyl surrogate similarly schedules its shutdown delay rather than modelling rod/displacer geometry.
+The TMI core-uncovery case reduces fuel-to-coolant coupling. It does not solve
+coolant inventory. A physical treatment would need coolant level, pressure,
+and relief-flow dynamics. The Chernobyl case schedules the shutdown delay
+instead of modelling rod and displacer geometry.
 
 ## References
 
-- IAEA, *INSAG-7: The Chernobyl Accident*: https://pub.iaea.org/MTCD/publications/PDF/Pub913e_web.pdf
-- US NRC, *Backgrounder on the Three Mile Island Accident*: https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/3mile-isle
-- US NRC, *Bulletin 79-05A accident timeline*: https://www.nrc.gov/reading-rm/doc-collections/gen-comm/bulletins/1979/bl79005a
+- [IAEA, *INSAG-7: The Chernobyl Accident*](https://pub.iaea.org/MTCD/publications/PDF/Pub913e_web.pdf)
+- [US NRC, *Backgrounder on the Three Mile Island Accident*](https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/3mile-isle)
+- [US NRC, *Bulletin 79-05A accident timeline*](https://www.nrc.gov/reading-rm/doc-collections/gen-comm/bulletins/1979/bl79005a)

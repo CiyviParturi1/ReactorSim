@@ -116,7 +116,7 @@ struct ReactorParams {
         const float beta[PRECURSOR_GROUPS] = {
             0.000266f, 0.001491f, 0.001316f, 0.002849f, 0.000896f, 0.000182f
         };
-        // Three groups sum to 0.066 → 6.6% decay heat at full power.
+        // Three groups sum to 0.066, or 6.6% decay heat at full power.
         const float fractions[DECAY_GROUPS] = {
             PK_DECAY_FRACTION_0, PK_DECAY_FRACTION_1, PK_DECAY_FRACTION_2
         };
@@ -419,7 +419,7 @@ inline void set_rod_target(ReactorState& state, float target) {
 // ---------------------------------------------------------------------------
 
 inline void move_rods(ReactorState& state, float h) {
-    // Full travel (0→1) takes 100 simulated seconds at rod_speed = 0.01.
+    // Full travel from 0 to 1 takes 100 simulated seconds at rod_speed = 0.01.
     const float rod_speed = 0.01f;
     const float rod_delta = state.rod_target - state.rod_position;
     if (rod_delta == 0.0f) {

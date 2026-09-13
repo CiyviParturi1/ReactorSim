@@ -19,9 +19,9 @@ intended revision before programming.
 
 ## Capture deterministic UART scenarios
 
-Schedules contain commands triggered by simulated time, avoiding a dependence
-on hardware compression. A schedule event has exactly one of `at_sim_time_s`
-or `at_wall_s`, plus `command` and optional `label`.
+Schedules trigger commands by simulated time, so they do not depend on
+hardware compression. Each event has `at_sim_time_s` or `at_wall_s`, a
+`command`, and an optional `label`.
 
 ```powershell
 python experiments\hardware_campaign.py capture `
@@ -39,8 +39,8 @@ and simulation-time reversals.
 
 For a manual GUI or GPIO action, keep a screenshot/photo and append the action
 and observed simulated time to `command_timeline.csv`; the following UART
-state transition should provide the independently captured result. GPIO actions
-must be rising edges: SW0 withdrawal, SW1 insertion, SW7 SCRAM.
+state transition provides the captured result. GPIO actions must be rising
+edges. SW0 withdraws the rods, SW1 inserts them, and SW7 triggers SCRAM.
 
 Run M0, M1, and M2 as separate 1,000-frame captures (`--max-wall-s 130` is
 normally sufficient). The reported `achieved_factor` is measured by the ARM,
@@ -48,7 +48,7 @@ not assumed from the requested mode. For the 36-hour xenon run, reset to C0 and
 full power, issue SCRAM, select M2, and capture through simulated time
 129,610 s (36 h after the 10 s SCRAM event).
 
-## PC–FPGA parity
+## PC-to-FPGA parity
 
 After recording an identical deterministic PC reference CSV, align it with the
 captured FPGA telemetry by simulated time:
@@ -62,13 +62,13 @@ python experiments\hardware_campaign.py parity `
 
 The report includes RMSE and maximum absolute difference for N, fuel and
 coolant temperature, iodine, xenon, reactivity, decay heat, and rod position.
-Its default scaled tolerance is the existing PC/HLS `2e-5` tolerance; compare
-the maximum errors with the six-decimal UART quantization allowance.
+The default scaled tolerance is the PC/HLS value of `2e-5`. Compare the
+maximum errors with the six-decimal UART quantization allowance.
 
-After all raw evidence and parity reports have been added, generate the final
-Chapter 7 Markdown and JSON summary (including the physical acceptance matrix,
-timing/compression table, UART reliability data, parity report count, and an
-iodine-xenon graph when a test directory is named `xenon...`):
+After adding the raw evidence and parity reports, generate the Chapter 7
+Markdown and JSON summary. It includes the acceptance matrix, timing data,
+UART results, parity report count, and an iodine-xenon graph when a test
+directory starts with `xenon`.
 
 ```powershell
 python experiments\hardware_campaign.py summary `
